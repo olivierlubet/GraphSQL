@@ -1,5 +1,14 @@
 package graphsql.catalog
 
+import graphsql.{Catalog, Column}
+import graphsql.parser.QueryOutput
+import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.analysis.{UnresolvedAttribute, UnresolvedRelation}
+import org.apache.spark.sql.catalyst.expressions.{Alias, CaseWhen, EqualTo, Expression, Literal}
+import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project, SubqueryAlias}
+import org.apache.spark.sql.execution.command.DropTableCommand
+import org.apache.spark.sql.execution.datasources.CreateTable
+
 
 case class Builder(catalog: Catalog = new Catalog) {
 

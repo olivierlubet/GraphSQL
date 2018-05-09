@@ -1,6 +1,9 @@
 package graphsql
 
-import org.apache.spark.graphx
+import graphsql.catalog.Browser
+import org.apache.spark.graphx.{Edge, Graph, VertexId}
+import org.apache.spark.{SparkContext, graphx}
+import org.apache.spark.sql.SparkSession
 
 object GraphBuilder {
   val spark: SparkSession = SparkSession.builder.appName("GraphSQL").master("local").getOrCreate()

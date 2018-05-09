@@ -1,5 +1,7 @@
 package graphsql
 
+import org.scalatest.FunSuite
+
 class CatalogTest extends FunSuite {
 
 

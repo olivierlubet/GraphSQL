@@ -1,5 +1,7 @@
 package graphsql
 
+import org.apache.spark.graphx.VertexId
+
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 

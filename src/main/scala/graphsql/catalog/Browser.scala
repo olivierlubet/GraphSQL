@@ -1,5 +1,8 @@
 package graphsql.catalog
 
+import graphsql._
+import org.apache.spark.graphx.{Edge, VertexId}
+
 
 class Browser(catalog: Catalog) {
   lazy val vertices: Seq[Vertex] = {

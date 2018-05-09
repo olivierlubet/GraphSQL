@@ -1,6 +1,10 @@
 package graphsql
 
-class GSGraphTest extends FunSuite {
+import graphsql.catalog.Builder
+import org.apache.spark.graphx.Graph
+import org.scalatest.FunSuite
+
+class GraphTest extends FunSuite {
   /*
   test("projet de") {
     val sql ="""
