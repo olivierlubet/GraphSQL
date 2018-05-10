@@ -4,7 +4,7 @@ import graphsql._
 import org.apache.spark.graphx.{Edge, VertexId}
 
 
-class Browser(catalog: Catalog) {
+class CatalogBrowser(catalog: Catalog) {
   lazy val vertices: Seq[Vertex] = {
     catalog.databases.values.flatMap(d => browse(d)).toSeq
   }

@@ -10,21 +10,11 @@ import org.apache.spark.sql.execution.command.DropTableCommand
 import org.apache.spark.sql.execution.datasources.CreateTable
 
 
-case class Builder(catalog: Catalog = new Catalog) {
+case class CatalogBuilder(catalog: Catalog = new Catalog) {
 
 
   // TODO: passer le catalogue en param pour le rendre "fonctionnel"
-  /*def buildGraphX(plan: LogicalPlan): Graph[String, String] = {
-    val sg: QueryOutput = buildFromPlan(plan)
-    val browser:Browser = new Browser(catalog)
 
-    val vertex: Seq[(VertexId, String)] =
-      browser.vertices.map(v => (v.id,v.fullName))
-
-    val edges: Seq[Edge[String]] = browser.edges
-
-    graphx.Graph(sc.parallelize(vertex), sc.parallelize(edges))
-  }*/
   def add(plan: LogicalPlan): Catalog = {
     buildFromPlan(plan)
     catalog

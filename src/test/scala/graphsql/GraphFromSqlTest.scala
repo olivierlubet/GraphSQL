@@ -1,10 +1,10 @@
 package graphsql
 
-import graphsql.catalog.Builder
+import graphsql.catalog.CatalogBuilder
 import org.apache.spark.graphx.Graph
 import org.scalatest.FunSuite
 
-class GraphTest extends FunSuite {
+class GraphFromSqlTest extends FunSuite {
   /*
   test("projet de") {
     val sql ="""
@@ -31,8 +31,7 @@ class GraphTest extends FunSuite {
   }*/
 
   def fromSqlToGraphX(sql: String): Graph[String, String] = {
-    val p = Parser.parse(sql)
-    GraphBuilder.build(Builder().add(p))
+    GraphBuilder.buildFromSql(sql)
   }
 
   test("CASE WHEN THEN") {
