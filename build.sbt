@@ -2,6 +2,7 @@ name := "GraphSQL"
 
 version := "0.1"
 
+//scalaVersion := "2.11"
 scalaVersion := "2.11.8"
 //scalaVersion := "2.12.6"
 
@@ -13,7 +14,8 @@ mainClass in(Compile, run) := Some("MyApp")
 val sparkVersion = "2.3.0"
 
 resolvers ++= Seq(
-  "apache-snapshots" at "http://repository.apache.org/snapshots/"
+  "apache-snapshots" at "http://repository.apache.org/snapshots/",
+  "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 )
 
 libraryDependencies ++= Seq(
@@ -24,3 +26,6 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-hive" % sparkVersion,
   "mysql" % "mysql-connector-java" % "5.1.6"
 )
+
+// https://mvnrepository.com/artifact/org.json4s/json4s-native
+libraryDependencies += "org.json4s" %% "json4s-native" % "3.6.0-M3"

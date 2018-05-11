@@ -23,7 +23,8 @@ class FileLoaderTest extends FunSuite {
   test("testAddFile") {
     val sqls = FileLoader.load(getClass.getResource("/test1.sql"))
     //println("sqls:")
-    sqls.foreach (println)
+    //sqls.foreach (println)
+    assertResult(5)(sqls.length)
   }
 
 }

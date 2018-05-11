@@ -1,6 +1,7 @@
 package graphsql
 
 import graphsql.catalog.CatalogBuilder
+import graphsql.graphx.{GraphBuilder, GraphSQL}
 import org.apache.spark.graphx.Graph
 import org.scalatest.FunSuite
 
@@ -30,8 +31,8 @@ class GraphFromSqlTest extends FunSuite {
 
   }*/
 
-  def fromSqlToGraphX(sql: String): Graph[String, String] = {
-    GraphBuilder.buildFromSql(sql)
+  def fromSqlToGraphX(sql: String): GraphSQL = {
+    GraphBuilder.build(sql)
   }
 
   test("CASE WHEN THEN") {

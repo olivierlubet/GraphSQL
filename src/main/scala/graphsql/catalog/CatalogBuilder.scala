@@ -3,10 +3,10 @@ package graphsql.catalog
 import graphsql.{Catalog, Column}
 import graphsql.parser.QueryOutput
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.analysis.{UnresolvedAttribute, UnresolvedRelation}
+import org.apache.spark.sql.catalyst.analysis.{UnresolvedAttribute, UnresolvedRelation, UnresolvedStar}
 import org.apache.spark.sql.catalyst.expressions.{Alias, CaseWhen, EqualTo, Expression, Literal}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project, SubqueryAlias}
-import org.apache.spark.sql.execution.command.DropTableCommand
+import org.apache.spark.sql.execution.command.{AlterTableRenameCommand, DropTableCommand, SetCommand}
 import org.apache.spark.sql.execution.datasources.CreateTable
 
 
@@ -44,7 +44,10 @@ case class CatalogBuilder(catalog: Catalog = new Catalog) {
 
         case _ => throw new Exception("Unimplemented")
       }
-    case _: DropTableCommand => // Nothing to do
+    // Nothing to do
+    case _: DropTableCommand |
+         _: AlterTableRenameCommand | // TODO : gérer correctement le AlterTable // eg: tiers -> tiers_tmp (note : ne vaut que pour AIR)
+         _: SetCommand => // eg: "hive.exec.parallel=true"
       QueryOutput(Seq.empty, Seq.empty)
     case _ => throw new Exception("Unimplemented")
   }
@@ -108,6 +111,10 @@ case class CatalogBuilder(catalog: Catalog = new Catalog) {
           QueryOutput(Seq(catalog.getColumn(name, table.table, table.database.getOrElse("unknown"))), Seq.empty)
         case _ => throw new Exception("Unimplemented")
       }
+
+
+    case s: UnresolvedStar => // TODO : Gérer mieux les * // eg: "t1.*"
+      QueryOutput(Seq.empty, Seq.empty)
     case _ => throw new Exception("Unimplemented")
 
   }

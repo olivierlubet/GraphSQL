@@ -1,13 +1,7 @@
 
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.types._
+import org.json4s.JsonDSL._
+import org.json4s.native.JsonMethods._
+val json = List(1, 2, 3)
+compact(render(json))
 
-val spark = SparkSession
-  .builder()
-  .master("local")
-  .appName("Spark")
-  .config("spark.some.config.option", "some-value")
-  .getOrCreate()
 
-spark.stop()
