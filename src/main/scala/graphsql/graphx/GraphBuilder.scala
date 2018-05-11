@@ -19,24 +19,24 @@ object GraphBuilder {
   spark.sparkContext.setLogLevel("ERROR")
   val sc: SparkContext = spark.sparkContext
 
-  def build(url: URL, catalog: Catalog = new Catalog)
+  def buildFromURL(url: URL, catalog: Catalog = new Catalog)
   : GraphSQL = {
     val sqls = FileLoader.load(url)
     sqls.foreach { sql =>
       val plan = Parser.parse(sql)
       CatalogBuilder(catalog).add(plan)
     }
-    GraphBuilder.build(catalog)
+    GraphBuilder.buildFromCatalog(catalog)
   }
 
-  def build(sql: String, catalog: Catalog = new Catalog)
+  def buildFromSql(sql: String, catalog: Catalog = new Catalog)
   : GraphSQL = {
     val plan = Parser.parse(sql)
     CatalogBuilder(catalog).add(plan)
-    GraphBuilder.build(catalog)
+    GraphBuilder.buildFromCatalog(catalog)
   }
 
-  def build(catalog: Catalog): GraphSQL = {
+  def buildFromCatalog(catalog: Catalog): GraphSQL = {
     val browser: CatalogBrowser = new CatalogBrowser(catalog)
     val vertex: Seq[(VertexId, String)] =
       browser.vertices.map(v => (v.id, v.fullName))

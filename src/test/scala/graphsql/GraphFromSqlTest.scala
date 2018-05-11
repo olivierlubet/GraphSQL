@@ -32,7 +32,7 @@ class GraphFromSqlTest extends FunSuite {
   }*/
 
   def fromSqlToGraphX(sql: String): GraphSQL = {
-    GraphBuilder.build(sql)
+    GraphBuilder.buildFromSql(sql)
   }
 
   test("CASE WHEN THEN") {

@@ -3,32 +3,37 @@ package graphsql.graphx
 import java.net.URL
 import java.io._
 
-import org.json4s.JsonAST
+
+import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
 
 object GraphWriter {
   def write(out: URL, graph: GraphSQL): Unit = {
-    val pw = new PrintWriter(new File(out.getPath))
+    val file = new File(out.getPath)
+    if (file.exists()) file.delete()
+    file.createNewFile()
+
+    val pw = new PrintWriter(file)
     write(pw, graph)
     pw.close()
   }
 
   def write(pw: PrintWriter, graph: GraphSQL): Unit = {
-    pw.write(compact(render(json(graph))))
+    pw.write("var data=" + pretty(render(json(graph))))//compact
   }
 
-  def json(graph: GraphSQL): JsonAST.JValue = {
+  def json(graph: GraphSQL): JValue = {
 
     val nodes = graph.vertices.map { case (id, name) =>
-      ("id" -> id) ~ ("name" -> name)
+      ("id" -> id) ~ ("label" -> name)
     }.collect.toList
 
 
     val links = graph.edges.map { e =>
-      ("source" -> e.srcId) ~ ("target" -> e.dstId)
+      ("from" -> e.srcId) ~ ("to" -> e.dstId)
     }.collect.toList
 
-    ("nodes" -> nodes) ~ ("links" -> links)
+    ("nodes" -> nodes) ~ ("edges" -> links)
   }
 }
