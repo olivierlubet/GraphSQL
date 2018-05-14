@@ -4,7 +4,7 @@ import java.net.URL
 
 import graphsql.catalog.{CatalogBrowser, CatalogBuilder}
 import graphsql.controler.FileLoader
-import graphsql.{Catalog, Parser}
+import graphsql.{Catalog, Parser, Vertex}
 import org.apache.spark.graphx.{Edge, Graph, VertexId}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
@@ -37,12 +37,9 @@ object GraphBuilder {
   }
 
   def buildFromCatalog(catalog: Catalog): GraphSQL = {
-    val browser: CatalogBrowser = new CatalogBrowser(catalog)
-    val vertex: Seq[(VertexId, String)] =
-      browser.vertices.map(v => (v.id, v.fullName))
-    val edges: Seq[Edge[String]] = browser.edges
-    val a: RDD[(VertexId, String)] = sc.parallelize(vertex)
-    val b: RDD[Edge[String]] = sc.parallelize(edges)
+    val browser = new CatalogBrowser(catalog)
+    val vertex = browser.vertices.map(v => (v.id, v))//v.fullName))
+    val edges = browser.edges
     Graph(sc.parallelize(vertex), sc.parallelize(edges))
   }
 }

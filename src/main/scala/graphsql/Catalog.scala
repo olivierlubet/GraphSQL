@@ -55,20 +55,21 @@ object Vertex {
   }
 }
 
-abstract class Vertex {
+abstract class Vertex (val name:String) extends Serializable {
 
   val id: VertexId = Vertex.nextId
 
   val fullName: String
-
   Vertex.innerCatalog += this
+
+  val group = this.getClass.getSimpleName
 }
 
 case class Column
 (
-  name: String,
+  override val name: String,
   table: Option[Table]
-) extends Vertex {
+) extends Vertex (name){
   lazy val fullName: String = databaseName + "." + tableName + "." + name
   lazy val tableName: String = table match {
     case Some(t: Table) => t.name
@@ -87,9 +88,9 @@ case class Column
 
 case class Table
 (
-  name: String,
+  override val name: String,
   database: Database
-) extends Vertex {
+) extends Vertex (name){
 
   lazy val fullName: String = database.name + "." + name
 
@@ -99,8 +100,8 @@ case class Table
 
 case class Database
 (
-  name: String
-) extends Vertex {
+  override val name: String
+) extends Vertex (name){
   lazy val fullName: String = name
   var tables: Map[String, Table] = Map[String, Table]()
 

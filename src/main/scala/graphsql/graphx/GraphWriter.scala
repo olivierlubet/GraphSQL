@@ -3,7 +3,7 @@ package graphsql.graphx
 import java.net.URL
 import java.io._
 
-
+import graphsql.Vertex
 import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
@@ -20,13 +20,13 @@ object GraphWriter {
   }
 
   def write(pw: PrintWriter, graph: GraphSQL): Unit = {
-    pw.write("var data=" + pretty(render(json(graph))))//compact
+    pw.write("var data=" + pretty(render(json(graph)))) //compact
   }
 
   def json(graph: GraphSQL): JValue = {
-
-    val nodes = graph.vertices.map { case (id, name) =>
-      ("id" -> id) ~ ("label" -> name)
+println(graph.vertices.collect().size)// ici ano
+    val nodes = graph.vertices.map { case (id, v)  => // name) =>
+      ("id" -> id) ~ ("label" -> v.name) ~ ("group" -> v.group)
     }.collect.toList
 
 

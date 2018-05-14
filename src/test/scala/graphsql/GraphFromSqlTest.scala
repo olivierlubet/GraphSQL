@@ -48,16 +48,16 @@ class GraphFromSqlTest extends FunSuite {
         |FROM t
       """.stripMargin
     val g = fromSqlToGraphX(sql)
-    assertResult(1)(g.vertices.filter { case (_, c: String) => c == "unknown.t.foo" }.count)
-    assertResult(1)(g.vertices.filter { case (_, c: String) => c == "unknown.unknown.baz" }.count)
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "unknown.t.foo" }.count)
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "unknown.unknown.baz" }.count)
   }
 
 
   test("select foo as baz from t") {
     val sql = "select foo as baz from t"
     val g = fromSqlToGraphX(sql)
-    assertResult(1)(g.vertices.filter { case (_, c: String) => c == "unknown.t.foo" }.count)
-    assertResult(1)(g.vertices.filter { case (_, c: String) => c == "unknown.t.foo" }.count)
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "unknown.t.foo" }.count)
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "unknown.t.foo" }.count)
 
     //g.vertices.foreach(println)
     //g.edges.foreach(println)
@@ -76,14 +76,14 @@ class GraphFromSqlTest extends FunSuite {
   test("select foo from ${ENV_DB}.t") {
     val sql = """select foo from ${ENV_DB}.t"""
     val g = fromSqlToGraphX(sql)
-    assertResult(1)(g.vertices.filter { case (_, c: String) => c == "ENV_DB.t.foo" }.count)
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "ENV_DB.t.foo" }.count)
   }
 
   test("create table baz as select id from foo") {
     val sql = "create table baz as select id from foo"
     val g = fromSqlToGraphX(sql)
-    assertResult(1)(g.vertices.filter { case (_, c: String) => c == "unknown.baz.id" }.count)
-    assertResult(1)(g.vertices.filter { case (_, c: String) => c == "unknown.foo.id" }.count)
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "unknown.baz.id" }.count)
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "unknown.foo.id" }.count)
     //g.vertices.foreach(println)
     //g.edges.foreach(println)
     assertResult(5)(g.edges.count())
@@ -94,18 +94,18 @@ class GraphFromSqlTest extends FunSuite {
   test("select b.id from foo,baz b") {
     val sql = "select b.id from foo,baz b"
     val g = fromSqlToGraphX(sql)
-    assertResult(1)(g.vertices.filter { case (_, c: String) => c == "unknown.baz.id" }.count)
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "unknown.baz.id" }.count)
   }
 
   test("select baz.id from foo,baz") {
     val sql = "select baz.id from foo,baz"
     val g = fromSqlToGraphX(sql)
-    assertResult(1)(g.vertices.filter { case (_, c: String) => c == "unknown.baz.id" }.count)
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "unknown.baz.id" }.count)
   }
 
   test("select foo from baz") {
     val sql = "select foo from baz"
     val g = fromSqlToGraphX(sql)
-    assertResult(1)(g.vertices.filter { case (_, c: String) => c == "unknown.baz.foo" }.count)
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "unknown.baz.foo" }.count)
   }
 }

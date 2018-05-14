@@ -3,5 +3,5 @@ package graphsql
 import org.apache.spark.graphx.Graph
 
 package object graphx {
-  type GraphSQL = Graph[String, String]
+  type GraphSQL = Graph[Vertex, String]
 }
