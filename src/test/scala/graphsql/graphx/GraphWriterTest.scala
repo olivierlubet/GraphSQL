@@ -23,7 +23,8 @@ class GraphWriterTest extends FunSuite {
   test("json") {
     val j = fromSqlToJson("select foo from baz")
     //println("render:"+pretty(render(j)))
-    assertResult(1)(filter(j, "unknown.baz.foo").size)
+    assertResult(1)(filter(j, "foo").size)
+    assertResult(1)(filter(j, "baz").size)
   }
 
   test("write") {

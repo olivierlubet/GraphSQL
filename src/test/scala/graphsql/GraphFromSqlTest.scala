@@ -35,6 +35,20 @@ class GraphFromSqlTest extends FunSuite {
     GraphBuilder.buildFromSql(sql)
   }
 
+  test("LEFT OUTER JOIN") {
+    val g = fromSqlToGraphX(
+      """
+        |SELECT
+        |  t1.*, -- commentaire
+        |  t2.partenaire_segment_code,
+        |  t2.partenaire_segment
+        |FROM ${BDD_LEASING_DATA_TMP}.agr_tiers_tmp1 t1
+        |LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.tiers_bt_roles t2
+      """.stripMargin)
+
+    assertResult(1)(g.vertices.filter { case (_, v:Vertex) => v.fullName== "BDD_LEASING_DATA_TMP.agr_tiers_tmp1.*" }.count)
+  }
+
   test("CASE WHEN THEN") {
     val sql =
       """

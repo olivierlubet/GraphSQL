@@ -27,5 +27,3 @@ LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.tiers_bt_agrement t3
 ON (t1.ie_tiers=t3.ie_tiers)
 LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.tiers_bt_corres_crca t4
 ON (t1.ie_tiers=t4.ie_tiers);
-
-DROP TABLE ${BDD_LEASING_DATA_TMP}.agr_tiers_tmp1;

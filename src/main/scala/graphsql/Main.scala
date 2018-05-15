@@ -25,5 +25,7 @@ object Main extends App {
 
   val sql = "select b.id i, titi, 'toto' as c from baz b,foo"
   val p = Parser.parse(sql)
+
+  println(p)
 }
 

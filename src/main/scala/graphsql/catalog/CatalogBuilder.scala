@@ -41,15 +41,12 @@ case class CatalogBuilder(catalog: Catalog = new Catalog) {
           }
 
           QueryOutput(scope, outScope)
-
-        case _ => throw new Exception("Unimplemented")
       }
     // Nothing to do
     case _: DropTableCommand |
          _: AlterTableRenameCommand | // TODO : gérer correctement le AlterTable // eg: tiers -> tiers_tmp (note : ne vaut que pour AIR)
          _: SetCommand => // eg: "hive.exec.parallel=true"
       QueryOutput(Seq.empty, Seq.empty)
-    case _ => throw new Exception("Unimplemented")
   }
 
   private def buildFromExpressions
@@ -109,13 +106,12 @@ case class CatalogBuilder(catalog: Catalog = new Catalog) {
           val name = f.nameParts(1)
           val table = sources(f.nameParts.head)
           QueryOutput(Seq(catalog.getColumn(name, table.table, table.database.getOrElse("unknown"))), Seq.empty)
-        case _ => throw new Exception("Unimplemented")
       }
 
 
     case s: UnresolvedStar => // TODO : Gérer mieux les * // eg: "t1.*"
       QueryOutput(Seq.empty, Seq.empty)
-    case _ => throw new Exception("Unimplemented")
+
 
   }
 
