@@ -11,13 +11,13 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.SparkContext
 
 object GraphBuilder {
-  val spark: SparkSession = SparkSession
+  lazy val spark: SparkSession = SparkSession
     .builder
     .appName("GraphSQL")
     .master("local")
     .getOrCreate()
   spark.sparkContext.setLogLevel("ERROR")
-  val sc: SparkContext = spark.sparkContext
+  lazy val sc: SparkContext = spark.sparkContext
 
   def buildFromURL(url: URL, catalog: Catalog = new Catalog)
   : GraphSQL = {

@@ -31,7 +31,7 @@ class GraphWriterTest extends FunSuite {
     val fileURL = getClass.getResource("/data.js")
     //println("fileURL:"+fileURL.getPath)
 
-    val g = GraphBuilder.buildFromURL(getClass.getResource("/test1.sql"))
+    val g = GraphBuilder.buildFromURL(getClass.getResource("/passants.sql"))
     GraphWriter.write(fileURL, g)
 
     val file = new File(fileURL.getPath)

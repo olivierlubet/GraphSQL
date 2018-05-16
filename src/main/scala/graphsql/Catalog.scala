@@ -13,24 +13,28 @@ class Catalog {
 
   def getColumn
   (columnName: String, tableName: String, dbName: String): Column = {
+    val columnNameL=columnName.toLowerCase
+    val tableNameL=tableName.toLowerCase
+    val dbNameL=dbName.toLowerCase
+
     if (tableName == "select") { // cas d'une table temporaire liée à un SELECT
-      Column(columnName, None)
+      Column(columnNameL, None)
     } else {
-      val db: Database = databases.getOrElse(dbName, {
-        val tmp: Database = Database(dbName)
-        databases += (dbName -> tmp)
+      val db: Database = databases.getOrElse(dbNameL, {
+        val tmp: Database = Database(dbNameL)
+        databases += (dbNameL -> tmp)
         tmp
       })
 
-      val table: Table = db.tables.getOrElse(tableName, {
-        val tmp: Table = Table(tableName, db)
-        db.tables += (tableName -> tmp)
+      val table: Table = db.tables.getOrElse(tableNameL, {
+        val tmp: Table = Table(tableNameL, db)
+        db.tables += (tableNameL -> tmp)
         tmp
       })
 
-      val column: Column = table.columns.getOrElse(columnName, {
-        val tmp = Column(columnName, Some(table))
-        table.columns += (columnName -> tmp)
+      val column: Column = table.columns.getOrElse(columnNameL, {
+        val tmp = Column(columnNameL, Some(table))
+        table.columns += (columnNameL -> tmp)
         tmp
       })
 

@@ -4,23 +4,9 @@ var options = {
     width: '100%',
 
     layout: {
-        randomSeed:357797
+        improvedLayout:false
     },
-/*
-layout: {
 
-hierarchical: {
-blockShifting:false,
-enabled: true,
-levelSeparation: 300,
-sortMethod : 'directed'
-}
-},
-physics: {
-hierarchicalRepulsion: {
-nodeDistance: 300
-}
-},*/
     nodes: {
         shape: 'dot',
         size: 20,

@@ -1,15 +1,8 @@
 
-DROP TABLE ${BDD_LEASING_DATA_TMP}.agr_tiers_tmp1;
+DROP TABLE ${BDD_TMP}.agr_tiers_tmp1;
 
 #@(#) -----------------------------------------------------------------------------------
 #@(#) Nom              : trans_projet.sql
-#@(#) Auteur           : capgemini
-#@(#) Date de creation : 06/12/2017
-#@(#) -----------------------------------------------------------------------------------
-#@(#) Description      : Alimentation table projet
-#@(#) -----------------------------------------------------------------------------------
-#@(#) Historique des modifications
-#@(#) 06/12/2017 - SKO - création
 #@(#) -----------------------------------------------------------------------------------
 
 
@@ -18,16 +11,16 @@ set hive.exec.parallel=true;
 
 -- Rapatriement des derniers scores calculés d'un projet DE
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.de_projet_score_step1;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.de_projet_score_step1 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.de_projet_score_step1;
+CREATE TABLE ${BDD_TMP}.de_projet_score_step1 AS
 SELECT n_numero_dossier,
   MAX(n_demande) AS n_demande
 FROM ${BDD_COMMUN}.de_reponse_octroi
 GROUP BY n_numero_dossier ;
 
 -- Table temporaire permettant la récupération des scores d'un projet DE
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.de_projet_score;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.de_projet_score AS
+DROP TABLE IF EXISTS ${BDD_TMP}.de_projet_score;
+CREATE TABLE ${BDD_TMP}.de_projet_score AS
 SELECT DISTINCT a.n_numero_dossier AS id_projet_origine,
   CASE
     WHEN b.c_statut = 'ATTENTE'
@@ -38,14 +31,14 @@ SELECT DISTINCT a.n_numero_dossier AS id_projet_origine,
     THEN 'ROUGE'
   END             AS score,
   b.l_commentaire AS score_motif
-FROM ${BDD_LEASING_DATA_TMP}.de_projet_score_step1 a
+FROM ${BDD_TMP}.de_projet_score_step1 a
 LEFT OUTER JOIN ${BDD_COMMUN}.de_reponse_octroi b
 ON (a.n_numero_dossier = b.n_numero_dossier
 AND a.n_demande = b.n_demande);
 
 -- Table temporaire permettant la récupération des types de population d'un projet DE
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.de_projet_population;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.de_projet_population AS
+DROP TABLE IF EXISTS ${BDD_TMP}.de_projet_population;
+CREATE TABLE ${BDD_TMP}.de_projet_population AS
 SELECT a.id_projet_origine,
   b.l_libelle AS modele_population,
   a.code_type_dossier,
@@ -82,24 +75,24 @@ SELECT a.id_projet_origine,
     THEN 'Simple'
     ELSE 'Complexe'
   END AS complexite
-FROM ${BDD_LEASING_DATA_TMP}.de_dossier_step1 a
+FROM ${BDD_TMP}.de_dossier_step1 a
 LEFT OUTER JOIN ${BDD_COMMUN}.de_nomenclature b
 ON ( a.c_provenance = b.c_nomenclature
 AND b.c_type_nomenclature = 'PRDO' );
 
 -- Table temporaire permettant la récupération des modèles de marché d'un projet DE
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.de_projet_marche;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.de_projet_marche AS
+DROP TABLE IF EXISTS ${BDD_TMP}.de_projet_marche;
+CREATE TABLE ${BDD_TMP}.de_projet_marche AS
 SELECT a.id_projet_origine,
   b.l_libelle AS modele_marche
-FROM ${BDD_LEASING_DATA_TMP}.de_dossier_step1 a
+FROM ${BDD_TMP}.de_dossier_step1 a
 LEFT OUTER JOIN ${BDD_COMMUN}.de_nomenclature b
 ON ( a.c_marche_ccf = b.c_nomenclature
 AND b.c_type_nomenclature = 'MCCF' );
 
 -- Table temporaire stockant les modèle de marché et de population des dossiers DE
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.de_projet_step1;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.de_projet_step1 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.de_projet_step1;
+CREATE TABLE ${BDD_TMP}.de_projet_step1 AS
 SELECT
   CASE
     WHEN a.id_projet_origine IS NULL
@@ -109,13 +102,13 @@ SELECT
   b.modele_marche,
   a.modele_population,
   a.complexite
-FROM ${BDD_LEASING_DATA_TMP}.de_projet_population a
-FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.de_projet_marche b
+FROM ${BDD_TMP}.de_projet_population a
+FULL OUTER JOIN ${BDD_TMP}.de_projet_marche b
 ON ( a.id_projet_origine = b.id_projet_origine );
 
 -- Table temporaire stockant les modèle de marché, de population et le score des dossiers DE
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.de_projet_step2;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.de_projet_step2 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.de_projet_step2;
+CREATE TABLE ${BDD_TMP}.de_projet_step2 AS
 SELECT
   CASE
     WHEN a.id_projet_origine IS NULL
@@ -127,13 +120,13 @@ SELECT
   a.complexite,
   b.score,
   b.score_motif
-FROM ${BDD_LEASING_DATA_TMP}.de_projet_step1 a
-FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.de_projet_score b
+FROM ${BDD_TMP}.de_projet_step1 a
+FULL OUTER JOIN ${BDD_TMP}.de_projet_score b
 ON ( a.id_projet_origine = b.id_projet_origine ) ;
 
 -- Table rapatriant tous les éléments de DE
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_de;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_de AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_de;
+CREATE TABLE ${BDD_TMP}.projet_de AS
 SELECT concat('001_',a.id_projet)           AS id_projet,
   a.c_type_modele                           AS modele_economique,
   a.n_siren                                 AS cl_siren,
@@ -166,13 +159,13 @@ SELECT concat('001_',a.id_projet)           AS id_projet,
   b.complexite,
   b.score       AS score,
   b.score_motif AS score_motif
-FROM ${BDD_LEASING_DATA_TMP}.de_dossier_step1 a
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.de_projet_step2 b
+FROM ${BDD_TMP}.de_dossier_step1 a
+LEFT OUTER JOIN ${BDD_TMP}.de_projet_step2 b
 ON ( a.id_projet_origine = b.id_projet_origine );
 
 -- Table projet temporaire ajout NFC
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_de_nfc;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_de_nfc AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_de_nfc;
+CREATE TABLE ${BDD_TMP}.projet_de_nfc AS
 SELECT
   CASE
     WHEN a.id_projet IS NOT NULL
@@ -214,22 +207,22 @@ SELECT
   c.es_crca_agence,
   c.es_reseau,
   c.bareme
-FROM ${BDD_LEASING_DATA_TMP}.projet_de a
-FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_origine_nfc c
+FROM ${BDD_TMP}.projet_de a
+FULL OUTER JOIN ${BDD_TMP}.projet_origine_nfc c
 ON ( a.id_projet = c.id_projet );
 
 
 ---  Etape de transformation avec EKIP ---
 -- Raptriement de tous les dossiers EKIP avec leur id technique
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.element_tmp;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.element_tmp AS
+DROP TABLE IF EXISTS ${BDD_TMP}.element_tmp;
+CREATE TABLE ${BDD_TMP}.element_tmp AS
 SELECT b.id_projet,
   a.id_element,
   a.id_simul_element,
   a.id_affaire,
   a.no_element
 FROM ${BDD_COMMUN}.ekip_element a
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_origine_tmp b
+LEFT OUTER JOIN ${BDD_TMP}.projet_origine_tmp b
 ON (a.id_element = b.id_projet_origine
 AND b.id_application="207-EKIP")
 ;
@@ -237,8 +230,8 @@ AND b.id_application="207-EKIP")
 
 -- Table intermédiaire servant à calculer le montant de financement CALEF
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.element_tmp2;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.element_tmp2 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.element_tmp2;
+CREATE TABLE ${BDD_TMP}.element_tmp2 AS
 SELECT DISTINCT t2.ID_ELEMENT,
   t1.ID_AFFAIRE,
   t1.IE_AFFAIRE,
@@ -272,8 +265,8 @@ AND (t1.TIERS_SOCIETE  = t4.TIERS_PARTICIPANT)
 WHERE t1.TIERS_SOCIETE = 'B' ;
 
 -- Création de la table pivot EKIP servant à l'agregation des données
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.element_simul;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.element_simul AS
+DROP TABLE IF EXISTS ${BDD_TMP}.element_simul;
+CREATE TABLE ${BDD_TMP}.element_simul AS
 SELECT a.id_projet,
   a.id_element,
   a.id_simul_element,
@@ -282,8 +275,8 @@ SELECT a.id_projet,
   b.teg_actuariel /100 AS tx_client,         -- transformer de pourcentage vers nombre décimal
   b.mt_bien_fin_ht     AS mt_financement_ht,
   c.mt_financement_calef_ht
-FROM ${BDD_LEASING_DATA_TMP}.element_tmp a
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.element_tmp2 c
+FROM ${BDD_TMP}.element_tmp a
+LEFT OUTER JOIN ${BDD_TMP}.element_tmp2 c
 ON (a.id_element = c.id_element)
 INNER JOIN ${BDD_COMMUN}.ekip_simul b
 ON ( a.id_simul_element = b.id_simul_element );
@@ -292,8 +285,8 @@ ON ( a.id_simul_element = b.id_simul_element );
 
 
 -- Table intermédiaire permettant le rapatriement des éléments provenant de ekip_speeltcbf
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_speeltcbf1;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_speeltcbf1 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_speeltcbf1;
+CREATE TABLE ${BDD_TMP}.projet_speeltcbf1 AS
 SELECT a.id_projet,
   b.id_element,
   CASE
@@ -311,18 +304,18 @@ SELECT a.id_projet,
     THEN b.taux_commission_servicing/100		  -- transformer de pourcentage vers nombre décimal
     ELSE 0.0
   END AS tx_comserv_convention
-FROM ${BDD_LEASING_DATA_TMP}.element_tmp a
+FROM ${BDD_TMP}.element_tmp a
 INNER JOIN ${BDD_COMMUN}.ekip_speeltcbf b
 ON ( a.id_element = b.id_element ) ;
 
 -- Table intermédiaire permettant le rapatriement des montants et intérets
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_mt_intrts_cap_rembourse;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_mt_intrts_cap_rembourse AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_mt_intrts_cap_rembourse;
+CREATE TABLE ${BDD_TMP}.projet_mt_intrts_cap_rembourse AS
 SELECT es.id_projet,
   es.id_element,
   SUM(interet) AS mt_interets_client,
   SUM(crb)     AS mt_capital_rembourse_client
-FROM ${BDD_LEASING_DATA_TMP}.element_simul es
+FROM ${BDD_TMP}.element_simul es
 INNER JOIN ${BDD_COMMUN}.ekip_tabech te
 ON (te.id_element =es.id_element
 AND te.code_statut='EXPL')
@@ -330,14 +323,14 @@ GROUP BY es.id_projet,
   es.id_element;
 
 -- Table intermédiaire permettant le rapatriement des taux de commission de risque
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_tx_com_risq;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_tx_com_risq AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_tx_com_risq;
+CREATE TABLE ${BDD_TMP}.projet_tx_com_risq AS
 SELECT e.id_projet,
   e.id_element,
   co.ie_convention,
   co.lib_convention,
   AVG(sp.pourcentage)/100 AS tx_commission_risque		-- transformer de pourcentage vers nombre décimal
-FROM ${BDD_LEASING_DATA_TMP}.element_simul e
+FROM ${BDD_TMP}.element_simul e
 INNER JOIN ${BDD_COMMUN}.ekip_simpres sp
 ON (e.id_simul_element=sp.id_simul_element
 AND sp.code_statut = 'EXPL' )
@@ -352,13 +345,13 @@ GROUP BY e.id_projet,
   co.lib_convention ;
 
 -- Table intermédiaire permettant le rapatriement des montants de commission de risque
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_mt_com_risq;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_mt_com_risq AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_mt_com_risq;
+CREATE TABLE ${BDD_TMP}.projet_mt_com_risq AS
 SELECT es.id_projet,
   es.id_element,
   SUM(c.code_sens_ni * c.mt_ht) AS mt_commission_risque_ht
 FROM ${BDD_COMMUN}.ekip_speeltcbf eta
-INNER JOIN ${BDD_LEASING_DATA_TMP}.element_simul es
+INNER JOIN ${BDD_TMP}.element_simul es
 ON ( es.id_element = eta.id_element )
 INNER JOIN ${BDD_COMMUN}.ekip_affaire a
 ON ( a.id_affaire=es.id_affaire )
@@ -377,13 +370,13 @@ GROUP BY es.id_projet,
   es.id_element ;
 
 -- Table intermédiaire permettant le rapatriement des montants de commission d'apport
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_mt_commission_apport;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_mt_commission_apport AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_mt_commission_apport;
+CREATE TABLE ${BDD_TMP}.projet_mt_commission_apport AS
 SELECT e.id_projet,
   e.id_element,
   concat(co.ie_convention,' ', co.lib_convention) AS commission,
   SUM(c.code_sens_ni * c.mt_ht)                   AS mt_commission_apport_ht
-FROM ${BDD_LEASING_DATA_TMP}.element_simul e
+FROM ${BDD_TMP}.element_simul e
 INNER JOIN ${BDD_COMMUN}.ekip_simpres sp
 ON (e.id_simul_element=sp.id_simul_element
 AND sp.code_statut = 'EXPL' )
@@ -401,8 +394,8 @@ GROUP BY e.id_projet,
   co.lib_convention ;
 
 -- Table rapatriant les élements sur la date échéance depuis tabech
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.tabech_events;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.tabech_events AS
+DROP TABLE IF EXISTS ${BDD_TMP}.tabech_events;
+CREATE TABLE ${BDD_TMP}.tabech_events AS
 SELECT id_element,
   MIN(date_eccheance_8601)                                                                               AS date_debut,
   MAX(date_eccheance_8601)                                                                               AS date_fin,
@@ -414,8 +407,8 @@ WHERE code_statut='EXPL'
 GROUP BY id_element;
 
 -- Table intermédiaire permettant d'avoir le premier loyer majoré, le taux sur la base locative et la valeur de rachat du dossier
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.tabech_1;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.tabech_1 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.tabech_1;
+CREATE TABLE ${BDD_TMP}.tabech_1 AS
 SELECT
   CASE
     WHEN a.id_element IS NULL
@@ -468,8 +461,8 @@ FULL OUTER JOIN
   ) b ON ( a.id_element   = b.id_element ) ;
 
 -- Jointure entre tabech_1 et tabech_events
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.tabech_final;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.tabech_final AS
+DROP TABLE IF EXISTS ${BDD_TMP}.tabech_final;
+CREATE TABLE ${BDD_TMP}.tabech_final AS
 SELECT
   CASE
     WHEN a.id_element IS NULL
@@ -482,14 +475,14 @@ SELECT
   b.nb_mois,
   b.nb_echeances,
   b.nb_echeances_par_an
-FROM ${BDD_LEASING_DATA_TMP}.tabech_1 a
-FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.tabech_events b
+FROM ${BDD_TMP}.tabech_1 a
+FULL OUTER JOIN ${BDD_TMP}.tabech_events b
 ON ( a.id_element = b.id_element );
 
 -- Première table temporaire EKIP permettant de rapatrier les informations contenues dans element_simul , projet_speeltcbf1
 -- tabech_final
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_ekip1;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_ekip1 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_ekip1;
+CREATE TABLE ${BDD_TMP}.projet_ekip1 AS
 SELECT DISTINCT
   CASE
     WHEN ekip1.id_projet IS NULL
@@ -520,8 +513,8 @@ FROM
     b.mt_comserv_convention_ht,
     b.tx_comserv_convention,
     (a.tx_nominal_client - b.tx_refi_crca ) AS tx_marge_financiere
-  FROM ${BDD_LEASING_DATA_TMP}.element_simul a
-  LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_speeltcbf1 b
+  FROM ${BDD_TMP}.element_simul a
+  LEFT OUTER JOIN ${BDD_TMP}.projet_speeltcbf1 b
   ON ( a.id_projet = b.id_projet )
   ) ekip1
 FULL OUTER JOIN
@@ -532,15 +525,15 @@ FULL OUTER JOIN
     b.nb_mois,
     b.nb_echeances,
     b.nb_echeances_par_an
-  FROM ${BDD_LEASING_DATA_TMP}.element_tmp a
-  LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.tabech_final b -- Réferencement des éléments de tabech_final avec un id_projet DATUM à partir de ekip_element
+  FROM ${BDD_TMP}.element_tmp a
+  LEFT OUTER JOIN ${BDD_TMP}.tabech_final b -- Réferencement des éléments de tabech_final avec un id_projet DATUM à partir de ekip_element
   ON ( a.id_element = b.id_element )
   ) ekip5 ON (ekip1.id_projet = ekip5.id_projet);
 
 -- Deuxième table temporaire EKIP permettant de rapatrier les informations contenues dans projet_tx_com_risq,
 -- projet_mt_intrts_cap_rembours + projet_mt_com_risq et projet_mt_commission_apport
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_ekip2;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_ekip2 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_ekip2;
+CREATE TABLE ${BDD_TMP}.projet_ekip2 AS
 SELECT
   CASE
     WHEN ekip2.id_projet IS NULL
@@ -562,8 +555,8 @@ FROM
     a.tx_commission_risque,
     b.mt_interets_client,
     b.mt_capital_rembourse_client
-  FROM ${BDD_LEASING_DATA_TMP}.projet_tx_com_risq a
-  FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_mt_intrts_cap_rembourse b -- (jointure entre projet_tx_com_risq et projet_mt_intrts_cap_rembourse)
+  FROM ${BDD_TMP}.projet_tx_com_risq a
+  FULL OUTER JOIN ${BDD_TMP}.projet_mt_intrts_cap_rembourse b -- (jointure entre projet_tx_com_risq et projet_mt_intrts_cap_rembourse)
   ON ( a.id_projet = b.id_projet )
   ) ekip2
 FULL JOIN
@@ -575,14 +568,14 @@ FULL JOIN
     END AS id_projet,
     a.mt_commission_risque_ht,
     b.mt_commission_apport_ht
-  FROM ${BDD_LEASING_DATA_TMP}.projet_mt_com_risq a
-  FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_mt_commission_apport b --(jointure entre projet_mt_commission_risq et projet_mt_commision_apport):
+  FROM ${BDD_TMP}.projet_mt_com_risq a
+  FULL OUTER JOIN ${BDD_TMP}.projet_mt_commission_apport b --(jointure entre projet_mt_commission_risq et projet_mt_commision_apport):
   ON (a.id_projet = b.id_projet)
   ) ekip3 ON (ekip2.id_projet = ekip3.id_projet);
 
 --Table intermédiaire permettant le rapatriement des montants frais dossier client(sprint5)
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_mt_frais_dossier_client;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_mt_frais_dossier_client AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_mt_frais_dossier_client;
+CREATE TABLE ${BDD_TMP}.projet_mt_frais_dossier_client AS
 SELECT t2.id_projet AS id_projet,
   t1.mt_frais_dossier_client
 FROM
@@ -609,12 +602,12 @@ INNER JOIN
   (SELECT t.id_element,
     e.id_projet
   FROM ${BDD_COMMUN}.ekip_tabech t
-  INNER JOIN ${BDD_LEASING_DATA_TMP}.element_tmp e
+  INNER JOIN ${BDD_TMP}.element_tmp e
   ON ( t.id_element = e.id_element )
   ) t2 ON (t1.id_element = t2.id_element);
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_mt_frais_crca_pnb;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_mt_frais_crca_pnb AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_mt_frais_crca_pnb;
+CREATE TABLE ${BDD_TMP}.projet_mt_frais_crca_pnb AS
 SELECT DISTINCT
   CASE
     WHEN t1.id_projet IS NULL
@@ -627,7 +620,7 @@ FROM
   (SELECT e.id_element,
     e.id_projet,
     CAST(SUM(sp.montant_prime) AS DECIMAL(15,2)) AS mt_frais_dossier_crca
-  FROM ${BDD_LEASING_DATA_TMP}.element_tmp e
+  FROM ${BDD_TMP}.element_tmp e
   INNER JOIN ${BDD_COMMUN}.ekip_simpres sp
   ON ( sp.id_simul_element = e.id_simul_element
   AND sp.code_statut ='EXPL' )
@@ -652,7 +645,7 @@ FULL OUTER JOIN
       SUM(interet) mt_ht,
       COUNT(e.id_element) nombre,
       'INTERETS' flux
-    FROM ${BDD_LEASING_DATA_TMP}.element_tmp e
+    FROM ${BDD_TMP}.element_tmp e
     INNER JOIN ${BDD_COMMUN}.ekip_simul s
     ON (e.id_simul_element=s.id_simul_element)
     INNER JOIN ${BDD_COMMUN}.ekip_tabech te
@@ -667,7 +660,7 @@ FULL OUTER JOIN
       COUNT(f.no_element) nombre ,
       libelle flux
     FROM ${BDD_COMMUN}.ekip_fluxprev f
-    INNER JOIN ${BDD_LEASING_DATA_TMP}.element_tmp e
+    INNER JOIN ${BDD_TMP}.element_tmp e
     ON ( f.id_element = e.id_element )
     GROUP BY e.id_projet,
       f.id_element,
@@ -677,8 +670,8 @@ FULL OUTER JOIN
     tb1.id_projet
   ) t2 ON (t1.id_projet = t2.id_projet) ;
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_code_offre_marge;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_code_offre_marge AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_code_offre_marge;
+CREATE TABLE ${BDD_TMP}.projet_code_offre_marge AS
 SELECT DISTINCT
   CASE
     WHEN t1.id_projet IS NULL
@@ -706,7 +699,7 @@ FROM
     END AS code_offre, --Rapatriement de la colonne code_offre qui represente le code_offre pour les differents elements EKIP
     t1.code_produit    -- ajout du code produit
   FROM ${BDD_COMMUN}.ekip_affaire t1
-  INNER JOIN ${BDD_LEASING_DATA_TMP}.element_tmp e
+  INNER JOIN ${BDD_TMP}.element_tmp e
   ON ( e.id_affaire = t1.id_affaire )
   ) t1
 FULL OUTER JOIN
@@ -718,14 +711,14 @@ FULL OUTER JOIN
     CAST(marge_frontale_montant AS     DECIMAL(15,2)) AS mt_marge_frontale,
     CAST(marge_frontale_bonifiee AS    DECIMAL(15,2)) AS mt_marge_frontale_bonifiee
   FROM ${BDD_COMMUN}.ekip_tri_resultats tr
-  INNER JOIN ${BDD_LEASING_DATA_TMP}.element_tmp e
+  INNER JOIN ${BDD_TMP}.element_tmp e
   ON ( e.id_element = tr.id_element )
   ) t2 ON (t1.id_projet = t2.id_projet) ;
 
 -- Toisième table temporaire EKIP permettant de rapatrier les informations contenues dans projet_mt_frais_dossier_client,
 -- projet_mt_frais_crca_pnb et agrégeant aussi les données provenant des 2 premières tables temporaires
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_ekip3;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_ekip3 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_ekip3;
+CREATE TABLE ${BDD_TMP}.projet_ekip3 AS
 SELECT DISTINCT
   CASE
     WHEN t1.id_projet IS NULL
@@ -781,8 +774,8 @@ FROM
     ekip2.mt_capital_rembourse_client,
     ekip2.mt_commission_risque_ht,
     ekip2.mt_commission_apport_ht
-  FROM ${BDD_LEASING_DATA_TMP}.projet_ekip1 ekip1
-  FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_ekip2 ekip2
+  FROM ${BDD_TMP}.projet_ekip1 ekip1
+  FULL OUTER JOIN ${BDD_TMP}.projet_ekip2 ekip2
   ON ( ekip1.id_projet = ekip2.id_projet )
   ) t1
 FULL OUTER JOIN
@@ -795,8 +788,8 @@ FULL OUTER JOIN
     a.mt_frais_dossier_client,
     b.mt_frais_dossier_crca,
     b.mt_pnb_ht
-  FROM ${BDD_LEASING_DATA_TMP}.projet_mt_frais_dossier_client a
-  FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_mt_frais_crca_pnb b
+  FROM ${BDD_TMP}.projet_mt_frais_dossier_client a
+  FULL OUTER JOIN ${BDD_TMP}.projet_mt_frais_crca_pnb b
   ON ( a.id_projet = b.id_projet )
   ) t2 ON ( t1.id_projet = t2.id_projet ) ;
 
@@ -804,8 +797,8 @@ FULL OUTER JOIN
 
 
 -- Table temporaire récuprérant toutes les données d'EKIP nécessaires à l'enrichissement du dataset final
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_ekip4;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_ekip4 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_ekip4;
+CREATE TABLE ${BDD_TMP}.projet_ekip4 AS
 SELECT DISTINCT
   CASE
     WHEN a.id_projet IS NULL
@@ -843,8 +836,8 @@ SELECT DISTINCT
   CAST(a.tx_client AS               DECIMAL(15,6)) AS tx_client,
   a.tx_premier_loyer_base_locative,
   CAST(a.tx_refi_crca AS DECIMAL(15,6)) AS tx_refi_crca
-FROM ${BDD_LEASING_DATA_TMP}.projet_ekip3 a
-FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_code_offre_marge b -- ajout des données rapatriées dans la table projet_code_offre_marge
+FROM ${BDD_TMP}.projet_ekip3 a
+FULL OUTER JOIN ${BDD_TMP}.projet_code_offre_marge b -- ajout des données rapatriées dans la table projet_code_offre_marge
 ON (a.id_projet = b.id_projet) ;
 
 --table intermediaire pour récuperer la colonne es_crca_region de la table nfc_element_structure
@@ -863,8 +856,8 @@ ON (a.id_projet = b.id_projet) ;
 --on (f.ie_element_structure= t.ie_element_structure);
 -----
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_ekip5;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_ekip5 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_ekip5;
+CREATE TABLE ${BDD_TMP}.projet_ekip5 AS
 SELECT DISTINCT
   --case
   --when t2.id_projet is null then t1.id_projet else t2.id_projet
@@ -904,13 +897,13 @@ SELECT DISTINCT
   t1.tx_refi_crca,
   --t2.id_element_structure as es_crca_region
   'null' AS es_crca_region
-FROM ${BDD_LEASING_DATA_TMP}.projet_ekip4 t1
+FROM ${BDD_TMP}.projet_ekip4 t1
   --full join projet_es_crca_region t2
   --on (t2.id_projet = t1.id_projet)
   ;
 -----
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_immobilisation; -- PR-OLU: normer la table d'enrichissement projet_ekip_eltimm_immob
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_immobilisation AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_immobilisation; -- PR-OLU: normer la table d'enrichissement projet_ekip_eltimm_immob
+CREATE TABLE ${BDD_TMP}.projet_immobilisation AS
 SELECT source.id_element,
   MIN(i.immobilisation) immobilisation
 FROM
@@ -930,15 +923,15 @@ GROUP BY source.id_element;
 
 -------
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_bien_principal;-- PR-OLU: normer la table d'enrichissement projet_ekip_eltimm_immob (nécessite un ALTER TABLE -> _tmp)
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_bien_principal AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_bien_principal;-- PR-OLU: normer la table d'enrichissement projet_ekip_eltimm_immob (nécessite un ALTER TABLE -> _tmp)
+CREATE TABLE ${BDD_TMP}.projet_bien_principal AS
 SELECT e.id_element,
   e.id_projet,
   i.designation_1 AS bien_designation,
   la1.cod_interne AS bien_nature_code,
   la1.libelle     AS bien_nature,
   la2.libelle     AS bien_categorie
-FROM ${BDD_LEASING_DATA_TMP}.projet_immobilisation pi
+FROM ${BDD_TMP}.projet_immobilisation pi
 INNER JOIN ${BDD_COMMUN}.ekip_immob i
 ON (i.immobilisation=pi.immobilisation)
 INNER JOIN ${BDD_COMMUN}.ekip_LIB_ACODIFS la1
@@ -947,13 +940,13 @@ AND la1.typ_code = 'ASCT' )
 INNER JOIN ${BDD_COMMUN}.ekip_LIB_ACODIFS la2
 ON (i.categorie_immob = la2.CODE
 AND la2.typ_code = 'CAIN' )
-INNER JOIN ${BDD_LEASING_DATA_TMP}.element_tmp e
+INNER JOIN ${BDD_TMP}.element_tmp e
 ON (e.id_element = pi.id_element);
 
 -- Table intermediaire permettant savoir à quelle assurance est eligible une nature de bien
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.eligibilite_nature_bien; -- PR-OLU: normer la table d'enrichissement "projet_de_natures_assurances_elligibilite"
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.eligibilite_nature_bien AS
+DROP TABLE IF EXISTS ${BDD_TMP}.eligibilite_nature_bien; -- PR-OLU: normer la table d'enrichissement "projet_de_natures_assurances_elligibilite"
+CREATE TABLE ${BDD_TMP}.eligibilite_nature_bien AS
 SELECT DISTINCT t1.ekip,
   t1.id_nat,
   IF(t2.c_cat_materiel      != 'null',1,0) AS assurance_bdm_eligibilite,
@@ -966,8 +959,8 @@ ON (t1.id_nat = t2.id_nat);
 
 -- PR-OLU: normer la table d'enrichissement "projet_de_natures_assurances_elligibilite" (nécessite un ALTER TABLE -> _tmp)
 -- OU si la table précédente part de la liste des éléments, supprimer cette table
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_bien_principal2;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_bien_principal2 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_bien_principal2;
+CREATE TABLE ${BDD_TMP}.projet_bien_principal2 AS
 SELECT t1.id_element,
   t1.id_projet,
   t1.bien_designation,
@@ -977,14 +970,14 @@ SELECT t1.id_element,
   t2.assurance_bdm_eligibilite,
   t2.assurance_pfi_eligibilite,
   t2.assurance_adi_eligibilite
-FROM ${BDD_LEASING_DATA_TMP}.projet_bien_principal t1
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.eligibilite_nature_bien t2
+FROM ${BDD_TMP}.projet_bien_principal t1
+LEFT OUTER JOIN ${BDD_TMP}.eligibilite_nature_bien t2
 ON (t1.bien_nature_code=t2.ekip);
 
 --------------
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_ekip6; -- TODO: externaliser l'étape finale d'enrichissement
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_ekip6 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_ekip6; -- TODO: externaliser l'étape finale d'enrichissement
+CREATE TABLE ${BDD_TMP}.projet_ekip6 AS
 SELECT DISTINCT t1.id_projet, -- PR-OLU: préférer t1.* et supprimer la recopie des champs
   t1.code_offre,
   t1.code_produit,
@@ -1025,16 +1018,16 @@ SELECT DISTINCT t1.id_projet, -- PR-OLU: préférer t1.* et supprimer la recopie
   t2.assurance_bdm_eligibilite,
   t2.assurance_pfi_eligibilite,
   t2.assurance_adi_eligibilite
-FROM ${BDD_LEASING_DATA_TMP}.projet_ekip5 t1
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_bien_principal2 t2
+FROM ${BDD_TMP}.projet_ekip5 t1
+LEFT OUTER JOIN ${BDD_TMP}.projet_bien_principal2 t2
 ON (t1.id_projet = t2.id_projet);
 
 -- Tables intermediaires permettant de calculer les FLAGS utiles pour le calcul du taux d'équipement BDM PFI ADI
 --BDM + PFI
 
 -- PR-OLU: distinguer en 3 tables d'enrichissement et normer "projet_ekip_clipres_bdm" "projet_ekip_clipres_adi" "projet_ekip_clipres_pfi"
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_flag_souscription_equip_1;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_flag_souscription_equip_1 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_flag_souscription_equip_1;
+CREATE TABLE ${BDD_TMP}.projet_flag_souscription_equip_1 AS
 SELECT CAST(
   CASE
     WHEN tb1.id_element IS NOT NULL
@@ -1054,7 +1047,7 @@ FROM
     e.id_element,
     COUNT(id_element) AS nb,
     1                 AS assurance_bdm_souscription
-  FROM ${BDD_LEASING_DATA_TMP}.element_tmp e
+  FROM ${BDD_TMP}.element_tmp e
   JOIN ${BDD_COMMUN}.ekip_simpres sp
   ON ( sp.id_simul_element=e.id_simul_element )
   INNER JOIN ${BDD_COMMUN}.ekip_clipres cp
@@ -1070,7 +1063,7 @@ FULL OUTER JOIN
     e.id_element,
     COUNT(id_element) AS nb,
     1                 AS assurance_pfi_souscription
-  FROM ${BDD_LEASING_DATA_TMP}.element_tmp e
+  FROM ${BDD_TMP}.element_tmp e
   INNER JOIN ${BDD_COMMUN}.ekip_simpres sp
   ON (sp.ID_SIMUL_ELEMENT=e.ID_SIMUL_ELEMENT)
   INNER JOIN ${BDD_COMMUN}.ekip_clipres cp
@@ -1085,8 +1078,8 @@ FULL OUTER JOIN
 
 --(BDM + PFI) + ADI
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_flag_souscription_equip_2;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_flag_souscription_equip_2 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_flag_souscription_equip_2;
+CREATE TABLE ${BDD_TMP}.projet_flag_souscription_equip_2 AS
 SELECT CAST(
   CASE
     WHEN tb1.id_element IS NOT NULL
@@ -1107,14 +1100,14 @@ FROM
     e.id_element,
     assurance_bdm_souscription,
     assurance_pfi_souscription
-  FROM ${BDD_LEASING_DATA_TMP}.projet_flag_souscription_equip_1 e
+  FROM ${BDD_TMP}.projet_flag_souscription_equip_1 e
   ) tb1
 FULL OUTER JOIN
   (SELECT e.id_projet,
     e.id_element,
     COUNT(id_element) AS nb,-- OLU: usage à échanger ;-)
     1                 AS assurance_adi_souscription
-  FROM ${BDD_LEASING_DATA_TMP}.element_tmp e
+  FROM ${BDD_TMP}.element_tmp e
   INNER JOIN ${BDD_COMMUN}.ekip_simpres sp
   ON (sp.ID_SIMUL_ELEMENT=e.ID_SIMUL_ELEMENT)
   INNER JOIN ${BDD_COMMUN}.ekip_clipres cp
@@ -1130,8 +1123,8 @@ FULL OUTER JOIN
 ---------------
 
   -- TODO : externaliser dans l'étape finale d'enrichissement
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_ekip7;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_ekip7 AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_ekip7;
+CREATE TABLE ${BDD_TMP}.projet_ekip7 AS
 SELECT DISTINCT t1.id_projet,-- PR-OLU : préférer t1.*
   t1.code_offre,
   t1.code_produit,
@@ -1175,14 +1168,14 @@ SELECT DISTINCT t1.id_projet,-- PR-OLU : préférer t1.*
   t2.assurance_bdm_souscription,
   t2.assurance_pfi_souscription,
   t2.assurance_adi_souscription
-FROM ${BDD_LEASING_DATA_TMP}.projet_ekip6 t1
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_flag_souscription_equip_2 t2
+FROM ${BDD_TMP}.projet_ekip6 t1
+LEFT OUTER JOIN ${BDD_TMP}.projet_flag_souscription_equip_2 t2
 ON (t1.id_projet = t2.id_projet);
 
 ------table intermediaire permettant d'ajouter deux colonnes reseau_apport_code et reseau_apport dans la table projet(sprint8)
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_code_reseau;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_code_reseau AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_code_reseau;
+CREATE TABLE ${BDD_TMP}.projet_code_reseau AS
 SELECT t3.id_affaire,
   t3.reseau_apport_code,
   t4.id_projet,
@@ -1217,13 +1210,13 @@ FROM
   ON (t1.code_reseau = t2.code)
   WHERE t2.typ_code  = 'RESE'
   ) AS t3
-INNER JOIN ${BDD_LEASING_DATA_TMP}.element_simul t4
+INNER JOIN ${BDD_TMP}.element_simul t4
 ON (t3.id_affaire = t4.id_affaire);
 
 -----
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_ekip;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_ekip AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_ekip;
+CREATE TABLE ${BDD_TMP}.projet_ekip AS
 SELECT DISTINCT t1.id_projet,
   t1.ie_affaire as 207_ekip_ie_affaire,
   t1.no_element as 207_ekip_no_element,
@@ -1269,48 +1262,48 @@ SELECT DISTINCT t1.id_projet,
   t1.assurance_adi_souscription,
   t2.reseau_apport_code,
   t2.reseau_apport
-FROM ${BDD_LEASING_DATA_TMP}.projet_ekip7 t1
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_code_reseau t2
+FROM ${BDD_TMP}.projet_ekip7 t1
+LEFT OUTER JOIN ${BDD_TMP}.projet_code_reseau t2
 ON (t1.id_projet = t2.id_projet);
 
 -- Table projet intermediaire liant tiers à projet
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_tiers_ekip;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_tiers_ekip AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_tiers_ekip;
+CREATE TABLE ${BDD_TMP}.projet_tiers_ekip AS
 SELECT a.id_projet ,
   t.id_tiers  AS tiers_apporteur_principal ,
   t1.id_tiers AS tiers_apporteur_commissionne ,
   t2.id_tiers AS tiers_agence_CAL ,
   t3.id_tiers AS tiers_commercial_CAL
-FROM ${BDD_LEASING_DATA_TMP}.projet_de a
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.tiers_tmp t
+FROM ${BDD_TMP}.projet_de a
+LEFT OUTER JOIN ${BDD_TMP}.tiers_tmp t
 ON a.n_apporteur_principal=t.ie_tiers
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.tiers_tmp t1
+LEFT OUTER JOIN ${BDD_TMP}.tiers_tmp t1
 ON a.n_apporteur_commissionne=t1.ie_tiers
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.tiers_tmp t2
+LEFT OUTER JOIN ${BDD_TMP}.tiers_tmp t2
 ON a.n_ext_pmp_agence=t2.ie_tiers
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.tiers_tmp t3
+LEFT OUTER JOIN ${BDD_TMP}.tiers_tmp t3
 ON a.n_ext_pmp_commercial=t3.ie_tiers;
 
 
 
 --table prenant les tiers venant de la base nfc à partir de la table tiers_tmp_nfc
 
-DROP TABLE ${BDD_LEASING_DATA_TMP}.projet_tiers_nfc;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_tiers_nfc AS
+DROP TABLE ${BDD_TMP}.projet_tiers_nfc;
+CREATE TABLE ${BDD_TMP}.projet_tiers_nfc AS
 SELECT t2.id_projet,
   t1.tiers_conseiller,
   t1.tiers_agence,
   t1.TIERS_CRCA
-FROM ${BDD_LEASING_DATA_TMP}.projet_tiers_tmp_nfc t1
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_origine_nfc t2
+FROM ${BDD_TMP}.projet_tiers_tmp_nfc t1
+LEFT OUTER JOIN ${BDD_TMP}.projet_origine_nfc t2
 ON (t2.id_projet_origine=t1.short_id)
 AND t2.id_application   ='659-LEASENET';
 
 -- Table projet temporaire ajout ekip
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_de_nfc_ekip;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_de_nfc_ekip AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_de_nfc_ekip;
+CREATE TABLE ${BDD_TMP}.projet_de_nfc_ekip AS
 SELECT
   CASE
     WHEN a.id_projet IS NULL
@@ -1404,19 +1397,19 @@ SELECT
   d.tiers_conseiller,
   d.tiers_agence,
   d.tiers_crca
-FROM ${BDD_LEASING_DATA_TMP}.projet_de_nfc a
-FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_ekip b
+FROM ${BDD_TMP}.projet_de_nfc a
+FULL OUTER JOIN ${BDD_TMP}.projet_ekip b
 ON (a.id_projet = b.id_projet)
-FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_tiers_ekip c
+FULL OUTER JOIN ${BDD_TMP}.projet_tiers_ekip c
 ON (a.id_projet = c.id_projet)
-FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_tiers_nfc d
+FULL OUTER JOIN ${BDD_TMP}.projet_tiers_nfc d
 ON (a.id_projet = d.id_projet);
 
 
 -- table projet temporaire ajout simulbail
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_de_nfc_ekip_simulbail;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_de_nfc_ekip_simulbail AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_de_nfc_ekip_simulbail;
+CREATE TABLE ${BDD_TMP}.projet_de_nfc_ekip_simulbail AS
 SELECT
   CASE
     WHEN a.id_projet IS NULL
@@ -1517,15 +1510,15 @@ SELECT
 		 when  a.mt_comserv_convention_ht =0 THEN a.tx_comserv_convention
 		 ELSE ROUND(((( a.mt_comserv_convention_ht/12)*a.nb_echeances)*(a.tx_nominal_client - a.tx_refi_crca - a.tx_commission_risque)) /(a.mt_commission_apport_ht+(( a.mt_comserv_convention_ht/12)*a.nb_echeances)),6)
 	END as tx_comserv_calef
-FROM ${BDD_LEASING_DATA_TMP}.projet_de_nfc_ekip a
-FULL OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_simulbail_only b
+FROM ${BDD_TMP}.projet_de_nfc_ekip a
+FULL OUTER JOIN ${BDD_TMP}.projet_simulbail_only b
 ON (a.id_projet = b.id_projet);
 
 
 -- Table comprenant les délais entre création, edition, signature et mise en loyer
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_air_evenement;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_air_evenement AS
+DROP TABLE IF EXISTS ${BDD_TMP}.projet_air_evenement;
+CREATE TABLE ${BDD_TMP}.projet_air_evenement AS
 SELECT * ,
   CASE
     WHEN DATEDIFF(dt_edition_nn, dt_creation_nn) >= 0
@@ -1578,7 +1571,7 @@ FROM
       MIN(e_edition.date_evenement ) dt_edition,
       MIN(e_signature.date_evenement ) dt_signature,
       MAX(e_mel.date_evenement ) dt_mel
-    FROM ${BDD_LEASING_DATA_TMP}.projet_de_nfc_ekip_simulbail p
+    FROM ${BDD_TMP}.projet_de_nfc_ekip_simulbail p
     LEFT OUTER JOIN ${BDD_LEASING_DATA}.projet_evenement e_creation
     ON p.id_projet          =e_creation.id_projet
     AND e_creation.evenement='CREE'--'Création'
@@ -1598,25 +1591,25 @@ FROM
   -------  Etape de transformation avec PDLR ---
 -- Raptriement de tous les dossiers PDLR avec leur id technique
 
-DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.element_tmp_pdlr;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.element_tmp_pdlr AS
+DROP TABLE IF EXISTS ${BDD_TMP}.element_tmp_pdlr;
+CREATE TABLE ${BDD_TMP}.element_tmp_pdlr AS
 SELECT b.id_projet,
   a.id_element,
   a.id_affaire
 FROM ${BDD_COMMUN}.pdlr_element a
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_origine_tmp b
+LEFT OUTER JOIN ${BDD_TMP}.projet_origine_tmp b
 ON (a.id_element = b.id_projet_origine
 AND b.id_application="040A")
 ;
 
  -- Table tempraire contenant les projets de differentes application avec les delais des fransformation
- DROP TABLE IF EXISTS ${BDD_LEASING_DATA_TMP}.projet_tmp;
-CREATE TABLE ${BDD_LEASING_DATA_TMP}.projet_tmp AS
+ DROP TABLE IF EXISTS ${BDD_TMP}.projet_tmp;
+CREATE TABLE ${BDD_TMP}.projet_tmp AS
 SELECT
   a.*,
   d.delai_edition ,
   d.delai_signature ,
   d.delai_mel
-FROM ${BDD_LEASING_DATA_TMP}.projet_de_nfc_ekip_simulbail a
-LEFT OUTER JOIN ${BDD_LEASING_DATA_TMP}.projet_air_evenement d
+FROM ${BDD_TMP}.projet_de_nfc_ekip_simulbail a
+LEFT OUTER JOIN ${BDD_TMP}.projet_air_evenement d
 ON (a.id_projet = d.id_projet);
