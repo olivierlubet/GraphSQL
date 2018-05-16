@@ -33,6 +33,11 @@ var options = {
         arrowStrikethrough:false,
         width: 2
     },
+    interaction: {
+        hover: true,
+        hoverConnectedEdges: false,
+        selectConnectedEdges: true,
+    },
     groups: {
         Database: {
             color:'#aaa',
@@ -47,7 +52,7 @@ var options = {
         Table: {
             shape: 'icon',
             icon: {code:'\uf0ce'},
-            mass:50
+            mass:5
         },
         Column: {
             color:'rgb(0,255,140)'
