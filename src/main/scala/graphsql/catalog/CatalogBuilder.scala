@@ -134,7 +134,7 @@ case class CatalogBuilder(catalog: Catalog = new Catalog) {
       in.scope.foreach(c => c.usedFor += out) // add Links
       QueryOutput(Seq(out), in.scope ++ in.outScope)
 
-    case _: IsNull | _: IsNotNull | _: Cast =>
+    case _: IsNull | _: IsNotNull | _: Cast | _:Not =>
       buildFromUnaryExpression(sources, exp.asInstanceOf[UnaryExpression])
 
 
@@ -154,21 +154,32 @@ case class CatalogBuilder(catalog: Catalog = new Catalog) {
 
 
   private def buildSources(plan: LogicalPlan): Map[String, TableIdentifier] = plan match {
+    /* PLAN */
+    /* Cas intéressant : il faut lier les colonnes d'un plan supérieur à un sous plan */
+    case u: Union => // UNION -> il faudra créer un alias pour chaque colonne, puis toutes les lier, autrement les tables s'écrasent
+      val ret = u.children.map(buildSources).reduce(_ ++ _)
+      //u.children.map(buildFromPlan).reduce() <-- TODO : ICI
+      ret
+    case p: Project => // SELECT
+      val ret = buildSources(p.child)
+      //buildFromPlan(p)
+      ret
+
     /* LEAF */
     case r: UnresolvedRelation =>
       Map(r.tableIdentifier.identifier -> r.tableIdentifier)
 
     /* BINARY NODES */
-    case j: Join =>
+    case j: Join => // JOIN
       buildSources(j.left) ++ buildSources(j.right)
 
     /* UNARY NODES */
-    case sa: SubqueryAlias =>
-      buildSources(sa.child).map {
+    case sa: SubqueryAlias => // FROM a AS b
+      buildSources(sa.child).map { // en cas de UNION, "__auto_generated_subquery_name"
         case (_, ta: TableIdentifier) => sa.alias -> ta
       }
 
-    case _: Filter |_: Project |_: Aggregate =>
+    case _: Filter | _: Aggregate | _: Distinct | _: Sort =>
       buildSources(plan.asInstanceOf[UnaryNode].child)
 
     case _ => throw new Exception("Unimplemented:\n" + plan)

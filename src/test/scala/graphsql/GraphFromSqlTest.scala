@@ -2,7 +2,7 @@ package graphsql
 
 import graphsql.catalog.CatalogBuilder
 import graphsql.graphx.{GraphBuilder, GraphSQL}
-import org.apache.spark.graphx.Graph
+import org.apache.spark.graphx.{Graph, VertexId}
 import org.scalatest.FunSuite
 
 class GraphFromSqlTest extends FunSuite {
@@ -16,6 +16,36 @@ class GraphFromSqlTest extends FunSuite {
     1 == g.vertices.filter { case (_, v: Vertex) => v.fullName == columnName }.count
   }
 
+  def areLinked(g: GraphSQL, fromColumn: String, toColumn: String): Boolean = {
+    val from = g.vertices.filter { case (_, v: Vertex) => v.fullName == fromColumn }.collect()
+    val to = g.vertices.filter { case (_, v: Vertex) => v.fullName == toColumn }.collect()
+    if (from.size != 1 || to.size != 1) {
+      false
+    } else {
+      g.edges.foreach(println)
+      1 == g.edges.filter(e => e.attr == "used for" && e.srcId == from.head._2.id && e.dstId == to.head._2.id).count()
+    }
+  }
+
+  // BUG : en cas de sélection de tables ayant le même nom de bases différentes
+
+  test("UNION in FROM") {
+    val g = fromSqlToGraphX(
+      """
+        |CREATE table a.foo as
+        |SELECT id
+        |FROM
+        |  (SELECT id from b.foo
+        |    UNION
+        |    SELECT id from c.baz
+        |    )
+      """.stripMargin)
+    g.vertices.foreach(println)
+    g.edges.foreach(println)
+    assert(areLinked(g, "c.baz.id", "a.foo.id"))
+    assert(areLinked(g, "b.foo.id", "a.foo.id"))
+  }
+/*
   test("Big complex query") {
     val g = fromSqlToGraphX(
       """
@@ -35,7 +65,7 @@ class GraphFromSqlTest extends FunSuite {
         |  c.echeance_max     AS echeance_max,
         |  d.mt_valeur_rachat AS mt_valeur_rachat
         |  FROM
-        |  (SELECT id_element,
+        |  (SELECT distinct id_element,
         |    MAX(no_echeance) AS echeance_max
         |      FROM ${BDD_COMMUN}.ekip_tabech
         |      WHERE code_statut='EXPL'
@@ -257,5 +287,5 @@ class GraphFromSqlTest extends FunSuite {
     val sql = "select foo from baz"
     val g = fromSqlToGraphX(sql)
     assert(existOne(g, "unknown.baz.foo"))
-  }
+  }*/
 }
