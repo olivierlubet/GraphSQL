@@ -19,15 +19,26 @@ class GraphFromSqlTest extends FunSuite {
   def areLinked(g: GraphSQL, fromColumn: String, toColumn: String): Boolean = {
     val from = g.vertices.filter { case (_, v: Vertex) => v.fullName == fromColumn }.collect()
     val to = g.vertices.filter { case (_, v: Vertex) => v.fullName == toColumn }.collect()
-    if (from.size != 1 || to.size != 1) {
-      false
-    } else {
-      g.edges.foreach(println)
+
+    from.size == 1 &&
+      to.size == 1 &&
       1 == g.edges.filter(e => e.attr == "used for" && e.srcId == from.head._2.id && e.dstId == to.head._2.id).count()
-    }
+
   }
 
-  // BUG : en cas de sélection de tables ayant le même nom de bases différentes
+  def print(g: GraphSQL) = {
+    println("GraphSQL")
+    g.vertices.sortBy(_._2.fullName).foreach { case (k, v: Vertex) => println(k + ":" + v.fullName) }
+    g.edges.foreach(println)
+  }
+
+  /**
+    * Le UNION ne peut pas fonctionner dans cette conception
+    * Pour aller plus loin, nécessité de :
+    * - passer un catalogue "fonctionnel" en paramètre de chaque fonction du CatalogBuilder -> remet en cause l'usage du mutable.HashMap
+    * - enrichir les fonction du catalogue pour pouvoir créer des tables (sans nécessairement de colonnes)
+    * - avoir un retour de Catalogue et non plus de QueryOutput
+    */
 
   test("UNION in FROM") {
     val g = fromSqlToGraphX(
@@ -40,10 +51,11 @@ class GraphFromSqlTest extends FunSuite {
         |    SELECT id from c.baz
         |    )
       """.stripMargin)
-    g.vertices.foreach(println)
-    g.edges.foreach(println)
-    assert(areLinked(g, "c.baz.id", "a.foo.id"))
-    assert(areLinked(g, "b.foo.id", "a.foo.id"))
+
+    print(g)
+    assert(areLinked(g, "c.baz.id", "id"))
+    assert(areLinked(g, "b.foo.id", "id"))
+    assert(areLinked(g, "id", "a.foo.id"))
   }
 /*
   test("Big complex query") {
@@ -156,16 +168,16 @@ class GraphFromSqlTest extends FunSuite {
   test("CREATE + IS NULL + IS NOT NULL") {
     val g = fromSqlToGraphX(
       """
-        |CREATE TABLE ${A}.foo AS
-        |SELECT
-        |  CASE
-        |        WHEN a.id3 IS  NOT NULL THEN a.id3
-        |    WHEN a.id IS NULL THEN a.id2
+            |CREATE TABLE ${A}.foo AS
+            |SELECT
+            |  CASE
+            |        WHEN a.id3 IS  NOT NULL THEN a.id3
+            |    WHEN a.id IS NULL THEN a.id2
 
-        |    ELSE a.id
-        |  END AS bar
-        |FROM ${B}.baz a
-      """.stripMargin)
+            |    ELSE a.id
+            |  END AS bar
+            |FROM ${B}.baz a
+          """.stripMargin)
     assert(existOne(g, "a.foo.bar"))
   }
 
@@ -173,13 +185,14 @@ class GraphFromSqlTest extends FunSuite {
     val g = fromSqlToGraphX(
       """CREATE TABLE ${B}.foo AS
         |SELECT a,
-        |MAX(m) AS b
+        |MAX(m) AS d
         |FROM ${A}.foo
         |GROUP BY a""".stripMargin)
 
-    assert(existOne(g, "b.foo.b"))
-    assert(existOne(g, "a.foo.a"))
+    assert(areLinked(g, "a.foo.m", "d"))
+    assert(areLinked(g, "d", "b.foo.d"))
   }
+
   test("MAX (and others functions)") {
     val g = fromSqlToGraphX(
       """
@@ -188,19 +201,18 @@ class GraphFromSqlTest extends FunSuite {
         |FROM ${A}.foo
         |GROUP BY a
       """.stripMargin)
-    assert(existOne(g, "unknown.unknown.b"))
-    assert(existOne(g, "a.foo.a"))
-  }
-  test("DISTINCT") {
-    val g = fromSqlToGraphX(
-      """
-        |CREATE TABLE ${foo}.bar AS
-        |SELECT DISTINCT a.baz AS id
-        |FROM ${fo}.ba a
-      """.stripMargin)
-    assert(existOne(g, "foo.bar.id"))
+    assert(areLinked(g, "a.foo.m", "b"))
   }
 
+      test("DISTINCT") {
+        val g = fromSqlToGraphX(
+          """
+            |CREATE TABLE ${foo}.bar AS
+            |SELECT DISTINCT a.baz AS id
+            |FROM ${fo}.ba a
+          """.stripMargin)
+        assert(existOne(g, "foo.bar.id"))
+      }
   test("STAR (A compléter)") {
     val g = fromSqlToGraphX(
       """
@@ -228,23 +240,16 @@ class GraphFromSqlTest extends FunSuite {
         |FROM t
       """.stripMargin
     val g = fromSqlToGraphX(sql)
-    assert(existOne(g, "unknown.t.foo"))
-    assert(existOne(g, "unknown.unknown.baz"))
+    assert(areLinked(g, "unknown.t.foo", "baz"))
   }
 
 
   test("select foo as baz from t") {
     val sql = "select foo as baz from t"
     val g = fromSqlToGraphX(sql)
-    assert(existOne(g, "unknown.unknown.baz"))
-    assert(existOne(g, "unknown.t.foo"))
 
-    //g.vertices.foreach(println)
-    //g.edges.foreach(println)
+    assert(areLinked(g, "unknown.t.foo", "baz"))
 
-    assertResult(3)(g.edges.count())
-    assertResult(1)(g.edges.filter(e => e.attr == "used for" && e.srcId < e.dstId).count())
-    //La colonne source a été créée avant la colonne de destination
   }
 
   test("drop table IF EXISTS baz") {

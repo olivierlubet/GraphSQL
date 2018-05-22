@@ -1,8 +1,8 @@
 package graphsql.parser
 
-import graphsql.Column
+import graphsql.NFColumn
 
-case class QueryOutput(scope: Seq[Column], outScope: Seq[Column]) {
+case class QueryOutput(scope: Seq[NFColumn], outScope: Seq[NFColumn]) {
 
 }
 
