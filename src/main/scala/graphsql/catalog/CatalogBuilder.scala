@@ -1,7 +1,6 @@
 package graphsql.catalog
 
 import graphsql._
-import graphsql.parser.QueryOutput
 import org.apache.spark.sql.catalyst._
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.expressions._
@@ -25,20 +24,47 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
 
   private def buildFromPlan(plan: LogicalPlan): Seq[Vertex] = plan match {
     case p: Project =>
-      val sources = buildSources(p.child)
-      buildFromExpressions(sources, p.projectList)
+      val scope = buildFromPlan(p.child)
+      buildFromExpressions(scope, p.projectList)
 
     case d: Distinct =>
       buildFromPlan(d.child)
 
     case a: Aggregate =>
-      val sources = buildSources(a.child)
-      buildFromExpressions(sources, a.aggregateExpressions)
+      val scope = buildFromPlan(a.child)
+      buildFromExpressions(scope, a.aggregateExpressions)
 
     /* PLAN with subqueries */
     case u: Union => buildFromPlan(u)
     case c: CreateTable => buildFromPlan(c)
 
+    /* UNARY NODES */
+    case sa: SubqueryAlias => // FROM a AS b ou encore UNION
+      buildFromPlan(sa.child).map {
+        case t: NFTable =>
+          NFTableAlias(sa.alias,t)
+        case c:NFColumn =>
+          val ret = sa.alias match {// en cas de UNION, sa.alias = "__auto_generated_subquery_name" -> remplacé par c.name
+            case "__auto_generated_subquery_name" =>NFColumn(c.name)
+            case _ => NFColumn(sa.alias)
+          }
+          c.usedFor+=ret
+          ret
+      }
+    /*{
+      case (_, ta: TableIdentifier) => sa.alias -> ta
+    }*/
+
+    case _: Filter | _: Aggregate | _: Distinct | _: Sort =>
+      buildFromPlan(plan.asInstanceOf[UnaryNode].child)
+
+    /* BINARY NODES */
+    case j: Join => // JOIN
+      buildFromPlan(j.left) ++ buildFromPlan(j.right)
+
+    /* LEAF */
+    case r: UnresolvedRelation =>
+      Seq(catalog.getTable(r.tableIdentifier))
 
     // Nothing to do
     case _: DropTableCommand |
@@ -60,7 +86,7 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
     }
     // Manage lynks
     u.children.map(buildFromPlan).foreach { case sScope =>
-      (sScope zip scope).foreach { case (c1 : NFColumn, c2: NFColumn) => c1.usedFor += c2 } // assume that we get same columns than in the first sub graph
+      (sScope zip scope).foreach { case (c1: NFColumn, c2: NFColumn) => c1.usedFor += c2 } // assume that we get same columns than in the first sub graph
       sScope
     }
 
@@ -79,7 +105,7 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
     }
     val scope = subGraph.map { case cc: NFColumn =>
       val newCol = catalog.getColumn(
-        cc.name, table.table, table.database.getOrElse("unknown")
+        cc.name, table.table, table.database
       )
       cc.usedFor += newCol // Lynk
       newCol
@@ -88,96 +114,96 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
   }
 
 
-  ////////////////////// Partie EXPRESSIONS ////////////////////////
+  ////////////////////// EXPRESSIONS ////////////////////////
 
   private def buildFromExpressions
   (
-    sources: Map[String, TableIdentifier],
+    inScope: Seq[Vertex],
     expressions: Seq[Expression]
   ): Seq[Vertex] = {
-    val graphs = expressions.map(exp => buildFromExpression(sources, exp))
-    val scope = graphs.flatten
-    scope
+    val graphs = expressions.map(exp => buildFromExpression(inScope, exp))
+    graphs.flatten
   }
 
   private def buildFromExpression
   (
-    sources: Map[String, TableIdentifier],
+    inScope: Seq[Vertex],
     exp: Expression
-  ): Seq[Vertex] = exp match {
-    /* LEAF Expression */
-    case l: Literal => Seq.empty
+  ): Seq[Vertex] = {
 
-    case f: UnresolvedAttribute =>
-      f.nameParts.size match {
-        case 1 =>
-          val name = f.nameParts.head
-          if (sources.size > 1) {
-            println("No table specification for column " + name)
-            Seq(catalog.getColumn(name, "unknown", "unknown"))
-          } else {
-            Seq(catalog.getColumn(name, sources.head._2.table, sources.head._2.database.getOrElse("unknown")))
-          }
-        case 2 =>
-          val name = f.nameParts(1)
-          val table = sources(f.nameParts.head)
-          Seq(catalog.getColumn(name, table.table, table.database.getOrElse("unknown")))
-      }
+    val tables: Map[String, NFTable] = inScope.flatMap {
+      case t: NFTable => Some(t)
+      case _ => None
+    }.map { t => t.name -> t }.toMap
+
+    exp match {
+
+      /* LEAF Expression */
+      case l: Literal => Seq.empty
+
+      case f: UnresolvedAttribute => Seq(catalog.getColumn(f.nameParts,inScope))
 
 
-    case s: UnresolvedStar => // TODO : Après constitution du catalogue, gérer les * pour lier l'ensemble des colones source / cible
-      s.target match {
-        case Some(a: ArrayBuffer[String]) =>
-          a.size match {
-            case 1 =>
-              val name = "*"
-              val table = sources(a(0))
-              Seq(catalog.getColumn(name, table.table, table.database.getOrElse("unknown")))
-          }
-        case _ => throw new Exception("Unimplemented:\n" + exp)
-      }
+      case s: UnresolvedStar => // TODO : Après constitution du catalogue, gérer les * pour lier l'ensemble des colones source / cible
+        s.target match {
+          case Some(a: ArrayBuffer[String]) =>
+            a.size match {
+              case 1 =>
+                Seq(catalog.getColumn(Seq(a.head,"*"),inScope))
+            }
+          case _ => throw new Exception("Unimplemented:\n" + exp)
+        }
 
-    /* Expressions */
-    case f: UnresolvedFunction =>
-      buildFromExpressions(sources, f.children)
+      /* Expressions */
+      case f: UnresolvedFunction =>
+        buildFromExpressions(inScope, f.children)
 
-    case c: CaseWhen =>
-      // parcourir l'ensemble des (cases , When) et consolider
-      val branches = c.branches.flatMap {
-        case (cas, whe) => Seq(
-          buildFromExpression(sources, cas),
-          buildFromExpression(sources, whe)
-        )
-      }.flatten
-      //val elseBranch = buildFromExpressions(sources, c.elseValue)
-      // TODO: deal with Options(Expression)
-      branches
+      case c: CaseWhen =>
+        // parcourir l'ensemble des (cases , When) et consolider
+        val branches = c.branches.flatMap {
+          case (cas, whe) => Seq(
+            buildFromExpression(inScope, cas),
+            buildFromExpression(inScope, whe)
+          )
+        }.flatten
+        //val elseBranch = buildFromExpressions(sources, c.elseValue)
+        // TODO: deal with Options(Expression)
+        branches
 
-    /* UnaryExpression */
-    case a: Alias =>
-      val in = buildFromExpression(sources, a.child)
-      val out = catalog.getColumn(a.name)
-      in.distinct.foreach{
-        case c:NFColumn => c.usedFor += out
-      } // add Links, removing duplicates (local duplicates only)
-      Seq(out)
+      /* UnaryExpression */
+      case a: Alias =>
+        val in = buildFromExpression(inScope, a.child)
+        val out = catalog.getColumn(a.name)
+        in.distinct.foreach {
+          case c: NFColumn => c.usedFor += out
+        } // add Links, removing duplicates (local duplicates only)
+        Seq(out)
 
-    case _: IsNull | _: IsNotNull | _: Cast | _: Not =>
-      buildFromUnaryExpression(sources, exp.asInstanceOf[UnaryExpression])
+      case _: IsNull | _: IsNotNull | _: Cast | _: Not =>
+        buildFromUnaryExpression(inScope, exp.asInstanceOf[UnaryExpression])
 
 
-    /* Binary Expression */
-    case _: EqualTo | _: Divide | _: Multiply | _: Add =>
-      buildFromBinaryExpression(sources, exp.asInstanceOf[BinaryExpression])
+      /* Binary Expression */
+      case _: EqualTo | _: Divide | _: Multiply | _: Add =>
+        buildFromBinaryExpression(inScope, exp.asInstanceOf[BinaryExpression])
 
-    case _ => throw new Exception("Unimplemented:\n" + exp)
+      case _ => throw new Exception("Unimplemented:\n" + exp)
+    }
   }
 
-  def buildFromBinaryExpression(sources: Map[String, TableIdentifier], b: BinaryExpression): Seq[Vertex] =
-    buildFromExpressions(sources, Seq(b.left, b.right))
+  def buildFromBinaryExpression
+  (
+    inScope: Seq[Vertex],
+    b: BinaryExpression
+  ): Seq[Vertex] =
+    buildFromExpressions(inScope, Seq(b.left, b.right))
 
-  def buildFromUnaryExpression(sources: Map[String, TableIdentifier], u: UnaryExpression): Seq[Vertex] =
-    buildFromExpression(sources, u.child)
+  def buildFromUnaryExpression
+  (
+    inScope: Seq[Vertex],
+    u: UnaryExpression
+  ): Seq[Vertex] =
+    buildFromExpression(inScope, u.child)
 
 
   //TODO: supprimer toute référence au buildSource (si inutile) et utiliser uniquement le catalogue

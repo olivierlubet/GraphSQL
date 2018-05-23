@@ -17,19 +17,18 @@ class GraphFromSqlTest extends FunSuite {
   }
 
   def areLinked(g: GraphSQL, fromColumn: String, toColumn: String): Boolean = {
-    val from = g.vertices.filter { case (_, v: Vertex) => v.fullName == fromColumn }.collect()
-    val to = g.vertices.filter { case (_, v: Vertex) => v.fullName == toColumn }.collect()
-
-    from.size == 1 &&
-      to.size == 1 &&
-      1 == g.edges.filter(e => e.attr == "used for" && e.srcId == from.head._2.id && e.dstId == to.head._2.id).count()
+    1 <= g.triplets.filter(t =>
+      t.srcAttr.fullName == fromColumn &&
+        t.attr == "used for" &&
+        t.dstAttr.fullName == toColumn).count()
 
   }
 
   def print(g: GraphSQL) = {
     println("GraphSQL")
-    g.vertices.sortBy(_._2.fullName).foreach { case (k, v: Vertex) => println(k + ":" + v.fullName) }
-    g.edges.foreach(println)
+    g.triplets.foreach { t =>
+      println(t.srcAttr.fullName + "(" + t.srcAttr.id + ") " + t.attr + " " + t.dstAttr.fullName + "(" + t.dstAttr.id + ")")
+    }
   }
 
   /**
@@ -52,12 +51,12 @@ class GraphFromSqlTest extends FunSuite {
         |    )
       """.stripMargin)
 
-    print(g)
+    //print(g)
     assert(areLinked(g, "c.baz.id", "id"))
     assert(areLinked(g, "b.foo.id", "id"))
     assert(areLinked(g, "id", "a.foo.id"))
   }
-/*
+
   test("Big complex query") {
     val g = fromSqlToGraphX(
       """
@@ -204,15 +203,15 @@ class GraphFromSqlTest extends FunSuite {
     assert(areLinked(g, "a.foo.m", "b"))
   }
 
-      test("DISTINCT") {
-        val g = fromSqlToGraphX(
-          """
-            |CREATE TABLE ${foo}.bar AS
-            |SELECT DISTINCT a.baz AS id
-            |FROM ${fo}.ba a
-          """.stripMargin)
-        assert(existOne(g, "foo.bar.id"))
-      }
+  test("DISTINCT") {
+    val g = fromSqlToGraphX(
+      """
+        |CREATE TABLE ${foo}.bar AS
+        |SELECT DISTINCT a.baz AS id
+        |FROM ${fo}.ba a
+      """.stripMargin)
+    assert(existOne(g, "foo.bar.id"))
+  }
   test("STAR (A compléter)") {
     val g = fromSqlToGraphX(
       """
@@ -240,7 +239,7 @@ class GraphFromSqlTest extends FunSuite {
         |FROM t
       """.stripMargin
     val g = fromSqlToGraphX(sql)
-    assert(areLinked(g, "unknown.t.foo", "baz"))
+    assert(areLinked(g, "t.foo", "baz"))
   }
 
 
@@ -248,7 +247,7 @@ class GraphFromSqlTest extends FunSuite {
     val sql = "select foo as baz from t"
     val g = fromSqlToGraphX(sql)
 
-    assert(areLinked(g, "unknown.t.foo", "baz"))
+    assert(areLinked(g, "t.foo", "baz"))
 
   }
 
@@ -267,30 +266,27 @@ class GraphFromSqlTest extends FunSuite {
   test("create table baz as select id from foo") {
     val sql = "create table baz as select id from foo"
     val g = fromSqlToGraphX(sql)
-    assert(existOne(g, "unknown.baz.id"))
-    assert(existOne(g, "unknown.foo.id"))
-    //g.vertices.foreach(println)
-    //g.edges.foreach(println)
-    assertResult(5)(g.edges.count())
-    assertResult(1)(g.edges.filter(e => e.attr == "used for" && e.srcId < e.dstId).count())
-
+    //print(g)
+    assert(areLinked(g, "foo.id", "baz.id"))
   }
 
   test("select b.id from foo,baz b") {
     val sql = "select b.id from foo,baz b"
     val g = fromSqlToGraphX(sql)
-    assert(existOne(g, "unknown.baz.id"))
+    //print(g)
+    assert(areLinked(g, "baz.id", "b.id"))
   }
 
   test("select baz.id from foo,baz") {
     val sql = "select baz.id from foo,baz"
     val g = fromSqlToGraphX(sql)
-    assert(existOne(g, "unknown.baz.id"))
+    assert(existOne(g, "baz.id"))
   }
 
   test("select foo from baz") {
     val sql = "select foo from baz"
     val g = fromSqlToGraphX(sql)
-    assert(existOne(g, "unknown.baz.foo"))
-  }*/
+    //print(g)
+    assert(existOne(g, "baz.foo"))
+  }
 }

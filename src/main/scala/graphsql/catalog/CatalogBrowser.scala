@@ -6,8 +6,11 @@ import org.apache.spark.graphx.{Edge, VertexId}
 
 class CatalogBrowser(catalog: NFCatalog) {
   lazy val vertices: Seq[Vertex] = {
-    catalog.databases.values.flatMap(d => browse(d)).toSeq
+    catalog.databases.values.flatMap(d => browse(d)).toSeq ++
+      catalog.unreferencedTables.flatMap(d => browse(d)) ++
+      catalog.unreferencedColumns.flatMap(d => browse(d))
   }
+
   lazy val edges: Seq[Edge[String]] = {
     vertices.flatMap {
       case d: NFDatabase => d.tables.values.map(t => Edge(d.id, t.id, "contains"))
@@ -15,6 +18,7 @@ class CatalogBrowser(catalog: NFCatalog) {
       case c: NFColumn => c.usedFor.map(cc => Edge(c.id, cc.id, "used for"))
     }
   }
+
   val alreadySeen = scala.collection.mutable.HashMap.empty[VertexId, Vertex]
 
   def browse(vertex: Vertex): Seq[Vertex] = {
