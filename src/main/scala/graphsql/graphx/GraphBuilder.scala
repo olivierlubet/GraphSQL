@@ -2,11 +2,11 @@ package graphsql.graphx
 
 import java.net.URL
 
-import graphsql.catalog.{CatalogBrowser, CatalogBuilder}
-import graphsql.controler.FileLoader
-import graphsql.{NFCatalog,  Parser, Vertex}
-import org.apache.spark.graphx.{Edge, Graph, VertexId}
-import org.apache.spark.rdd.RDD
+import graphsql.catalog._
+import graphsql.controler._
+import graphsql._
+import org.apache.spark.graphx._
+
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.SparkContext
 
@@ -19,9 +19,10 @@ object GraphBuilder {
   spark.sparkContext.setLogLevel("ERROR")
   lazy val sc: SparkContext = spark.sparkContext
 
+
   def buildFromURL(url: URL, catalog: NFCatalog = new NFCatalog)
   : GraphSQL = {
-    val sqls = FileLoader.load(url)
+    val sqls = SQLFileLoader.load(url)
     sqls.foreach { sql =>
       val plan = Parser.parse(sql)
       CatalogBuilder(catalog).add(plan)
@@ -38,7 +39,7 @@ object GraphBuilder {
 
   def buildFromCatalog(catalog: NFCatalog): GraphSQL = {
     val browser = new CatalogBrowser(catalog)
-    val vertex = browser.vertices.map(v => (v.id, v))//v.fullName))
+    val vertex = browser.vertices.map(v => (v.id, v))
     val edges: Seq[Edge[String]] = browser.edges
     Graph(sc.parallelize(vertex), sc.parallelize(edges))
   }

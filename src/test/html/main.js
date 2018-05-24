@@ -78,7 +78,7 @@ function getEdgeConnecting(a, b) {
 }
 
 function initData() {
-    data.nodes.filter(node => node.group=="Database").forEach(node => nodes.add(node))
+    data.nodes.filter(node => node.group=="NFDatabase").forEach(node => nodes.add(node))
 }
 
 

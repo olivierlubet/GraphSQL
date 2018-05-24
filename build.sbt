@@ -29,3 +29,5 @@ libraryDependencies ++= Seq(
 
 // https://mvnrepository.com/artifact/org.json4s/json4s-native
 libraryDependencies += "org.json4s" %% "json4s-native" % "3.6.0-M3"
+
+javaOptions ++= Seq("-Xmx8G")

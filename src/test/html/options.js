@@ -39,7 +39,7 @@ var options = {
         selectConnectedEdges: true,
     },
     groups: {
-        Database: {
+        NFDatabase: {
             color:'#aaa',
             shape: 'icon',
             icon: {
@@ -49,12 +49,12 @@ var options = {
             size:50,
             physics:false
         },
-        Table: {
+        NFTable: {
             shape: 'icon',
             icon: {code:'\uf0ce'},
             mass:5
         },
-        Column: {
+        NFColumn: {
             color:'rgb(0,255,140)'
         }
     }

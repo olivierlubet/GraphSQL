@@ -20,7 +20,7 @@ object GraphWriter {
   }
 
   def write(pw: PrintWriter, graph: GraphSQL): Unit = {
-    pw.write("var data=" + pretty(render(json(graph)))) //compact
+    pw.write("var data=" + compact(render(json(graph)))) //compact | pretty
   }
 
   def json(graph: GraphSQL): JValue = {

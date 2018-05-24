@@ -23,9 +23,9 @@ class GraphFromUrlTest extends FunSuite {
   test("test2.sql") {
     val g = GraphBuilder.buildFromURL(getClass.getResource("/test2.sql"))
 
-    g.triplets.foreach { case e: EdgeTriplet[Vertex, String] =>
+    /*g.triplets.foreach { case e: EdgeTriplet[Vertex, String] =>
       val (src, attr, dst) = (e.srcAttr, e.attr, e.dstAttr)
       println(src.fullName + " " + attr + " " + dst.fullName)
-    }
+    }*/
   }
 }

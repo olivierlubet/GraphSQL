@@ -1,8 +1,22 @@
 package graphsql
 
-object Main extends App {
+import graphsql.catalog.CatalogBuilder
+import graphsql.controler.{FileLoader, SQLFileLoader}
+import graphsql.graphx.{GraphBuilder, GraphWriter}
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
 
-  println("Hello")
+
+object Main extends App {
+  def time[R](block: => R): R = {
+    val t0 = System.nanoTime()
+    val result = block // call-by-name
+    val t1 = System.nanoTime()
+    println("Elapsed time: " + (t1 - t0) / 1000000000 + "s")
+    result
+  }
+
+  println("GraphSQL")
 
 
   /**
@@ -23,9 +37,62 @@ object Main extends App {
     * https://github.com/apache/spark/blob/master/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/parser/ParseDriver.scala
     */
 
-  val sql = "select b.id i, titi, 'toto' as c from baz b,foo"
-  val p = Parser.parse(sql)
 
-  println(p)
+  //val fileURL = getClass.getResource("/data.js")
+
+
+  /*
+  val folder = "C:\\Users\\hyma\\IdeaProjects\\GraphSQL\\src\\main\\resources\\sql"
+
+  def getListOfFiles(dir: String):List[File] = {
+    val d = new File(dir)
+    if (d.exists && d.isDirectory) {
+      d.listFiles.filter(_.isFile).toList
+    } else {
+      List[File]()
+    }
+  }
+
+  getListOfFiles(folder).foreach(f => println(f.getName))
+  */
+
+
+  lazy val spark: SparkSession = SparkSession
+    .builder
+    .appName("GraphSQL")
+    .master("local")
+    .getOrCreate()
+  spark.sparkContext.setLogLevel("ERROR")
+
+  time {
+    val catalog = new NFCatalog()
+    val files = FileLoader.load(getClass.getResource("/input.conf"))
+    println("Files to process:" + files.size)
+
+    files.foreach { f =>
+      time {
+        val url = getClass.getResource("/sql/" + f)
+        println("Processing " + url.getFile)
+
+        val sqls = SQLFileLoader.load(url)
+        println(sqls.size + " more sql requests to process")
+
+        sqls.foreach { sql =>
+          val plan = Parser.parse(sql)
+          CatalogBuilder(catalog).add(plan)
+        }
+        println("End of Processing " + url.getFile)
+      }
+    }
+
+    println("Building Graph")
+    val g = GraphBuilder.buildFromCatalog(catalog)
+
+    println("Writing Graph")
+    val fileURL = getClass.getResource("/data.js")
+    GraphWriter.write(fileURL, g)
+  }
+
+  spark.close()
 }
 

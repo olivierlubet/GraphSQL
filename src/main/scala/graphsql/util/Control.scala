@@ -14,7 +14,7 @@ object Control {
 
   def readURL(url: URL): Try[List[String]] = {
     Try {
-      val lines = using(Source.fromURL(url)) { source =>
+      val lines = using(Source.fromURL(url,"UTF-8")) { source =>
         (for (line <- source.getLines) yield line).toList
       }
       lines

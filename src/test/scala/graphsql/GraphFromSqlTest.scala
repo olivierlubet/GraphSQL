@@ -31,13 +31,31 @@ class GraphFromSqlTest extends FunSuite {
     }
   }
 
-  /**
-    * Le UNION ne peut pas fonctionner dans cette conception
-    * Pour aller plus loin, nécessité de :
-    * - passer un catalogue "fonctionnel" en paramètre de chaque fonction du CatalogBuilder -> remet en cause l'usage du mutable.HashMap
-    * - enrichir les fonction du catalogue pour pouvoir créer des tables (sans nécessairement de colonnes)
-    * - avoir un retour de Catalogue et non plus de QueryOutput
-    */
+
+  test ("INSERT") {
+
+    val g = fromSqlToGraphX(
+    """
+      |INSERT
+      |INTO foo.baz
+      |SELECT b.id FROM foo.bar b
+      """.stripMargin)
+    //print(g)
+    assert(areLinked(g, "foo.bar.id", "b.id"))
+    assert(areLinked(g, "b.id", "foo.baz.id"))
+  }
+
+  test("Rownum") {
+
+    val g = fromSqlToGraphX(
+      """
+        |CREATE TABLE foo.bar
+        |SELECT DISTINCT row_number() over() AS id
+        |from foo.baz
+      """.stripMargin)
+    assert(areLinked(g, "row_number", "id"))
+    assert(areLinked(g, "id", "foo.bar.id"))
+  }
 
   test("UNION in FROM") {
     val g = fromSqlToGraphX(
@@ -281,6 +299,12 @@ class GraphFromSqlTest extends FunSuite {
     val sql = "select baz.id from foo,baz"
     val g = fromSqlToGraphX(sql)
     assert(existOne(g, "baz.id"))
+  }
+
+  test("select * from baz") {
+    val sql = "select * from baz"
+    val g = fromSqlToGraphX(sql)
+    assert(existOne(g, "baz.*"))
   }
 
   test("select foo from baz") {

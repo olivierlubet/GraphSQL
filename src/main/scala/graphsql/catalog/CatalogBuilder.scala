@@ -3,7 +3,7 @@ package graphsql.catalog
 import graphsql._
 import org.apache.spark.sql.catalyst._
 import org.apache.spark.sql.catalyst.analysis._
-import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, _}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.CreateTable
@@ -23,7 +23,7 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
   }
 
   private def buildFromPlan(plan: LogicalPlan): Seq[Vertex] = plan match {
-    case p: Project =>
+    case p: Project => // SELECT
       val scope = buildFromPlan(p.child)
       buildFromExpressions(scope, p.projectList)
 
@@ -34,27 +34,31 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
       val scope = buildFromPlan(a.child)
       buildFromExpressions(scope, a.aggregateExpressions)
 
+
     /* PLAN with subqueries */
     case u: Union => buildFromPlan(u)
     case c: CreateTable => buildFromPlan(c)
+    case i: InsertIntoTable => buildFromPlan(i)
 
     /* UNARY NODES */
     case sa: SubqueryAlias => // FROM a AS b ou encore UNION
       buildFromPlan(sa.child).map {
         case t: NFTable =>
-          NFTableAlias(sa.alias,t)
-        case c:NFColumn =>
-          val ret = sa.alias match {// en cas de UNION, sa.alias = "__auto_generated_subquery_name" -> remplacé par c.name
-            case "__auto_generated_subquery_name" =>NFColumn(c.name)
+          NFTableAlias(sa.alias, t)
+        case c: NFColumn =>
+          val ret = sa.alias match {
+            // en cas de UNION, sa.alias = "__auto_generated_subquery_name" -> remplacé par c.name
+            case "__auto_generated_subquery_name" => NFColumn(c.name)
             case _ => NFColumn(sa.alias)
           }
-          c.usedFor+=ret
+          c.usedFor += ret
           ret
       }
     /*{
       case (_, ta: TableIdentifier) => sa.alias -> ta
     }*/
 
+    // Autres Unary Nodes
     case _: Filter | _: Aggregate | _: Distinct | _: Sort =>
       buildFromPlan(plan.asInstanceOf[UnaryNode].child)
 
@@ -73,6 +77,17 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
       Seq.empty
 
     case _ => throw new Exception("Unimplemented:\n" + plan)
+  }
+
+
+  private def buildFromPlan(i: InsertIntoTable): Seq[Vertex] = {
+    val table = buildFromPlan(i.table).head.asInstanceOf[NFTable] // Bug potentiel ?
+    buildFromPlan(i.query).map {
+      case c: NFColumn =>
+        val newCol = catalog.getColumn(c.name, table)
+        c.usedFor += newCol
+        newCol
+    }
   }
 
   private def buildFromPlan(u: Union): Seq[Vertex] = {
@@ -141,22 +156,21 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
       /* LEAF Expression */
       case l: Literal => Seq.empty
 
-      case f: UnresolvedAttribute => Seq(catalog.getColumn(f.nameParts,inScope))
+      case f: UnresolvedAttribute => Seq(catalog.getColumn(f.nameParts, inScope))
 
 
       case s: UnresolvedStar => // TODO : Après constitution du catalogue, gérer les * pour lier l'ensemble des colones source / cible
-        s.target match {
-          case Some(a: ArrayBuffer[String]) =>
-            a.size match {
-              case 1 =>
-                Seq(catalog.getColumn(Seq(a.head,"*"),inScope))
-            }
-          case _ => throw new Exception("Unimplemented:\n" + exp)
-        }
+        Seq(catalog.getColumn(s.target.getOrElse(Seq.empty) :+ "*", inScope))
 
       /* Expressions */
       case f: UnresolvedFunction =>
-        buildFromExpressions(inScope, f.children)
+        val col = catalog.getColumn(f.name.funcName) // TODO: ici distinguer colonne de fonction
+      val scope: Seq[Vertex] = buildFromExpressions(inScope, f.children)
+        scope.foreach {
+          case c: NFColumn => c.usedFor += col
+          case _ => throw new Exception("Unimplemented:\n" + exp)
+        }
+        Seq(col)
 
       case c: CaseWhen =>
         // parcourir l'ensemble des (cases , When) et consolider
@@ -184,17 +198,23 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
 
 
       /* Binary Expression */
-      case _: EqualTo | _: Divide | _: Multiply | _: Add =>
-        buildFromBinaryExpression(inScope, exp.asInstanceOf[BinaryExpression])
+      /* EqualTo  Divide  Multiply  Add  Subtract And GreaterThan GreaterThanOrEqual ...*/
+      case b: BinaryExpression =>
+        buildFromBinaryExpression(inScope, b)
+
+      /* Predicate */
+      case i: In => buildFromExpression(inScope, i.value)
+
+      case w: WindowExpression => buildFromExpression(inScope, w.windowFunction)
 
       case _ => throw new Exception("Unimplemented:\n" + exp)
     }
   }
 
-  def buildFromBinaryExpression
+  def buildFromBinaryExpression[T <: BinaryExpression]
   (
     inScope: Seq[Vertex],
-    b: BinaryExpression
+    b: T
   ): Seq[Vertex] =
     buildFromExpressions(inScope, Seq(b.left, b.right))
 
@@ -204,39 +224,5 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
     u: UnaryExpression
   ): Seq[Vertex] =
     buildFromExpression(inScope, u.child)
-
-
-  //TODO: supprimer toute référence au buildSource (si inutile) et utiliser uniquement le catalogue
-  private def buildSources(plan: LogicalPlan): Map[String, TableIdentifier] = plan match {
-    /* PLAN */
-    /* Cas intéressant : il faut lier les colonnes d'un plan supérieur à un sous plan */
-    case u: Union => // UNION -> il faudra créer un alias pour chaque colonne, puis toutes les lier, autrement les tables s'écrasent
-      val ret = u.children.map(buildSources).reduce(_ ++ _)
-      buildFromPlan(u)
-      ret
-
-    case p: Project => // SELECT
-      val ret = buildSources(p.child)
-      ret
-
-    /* LEAF */
-    case r: UnresolvedRelation =>
-      Map(r.tableIdentifier.identifier -> r.tableIdentifier)
-
-    /* BINARY NODES */
-    case j: Join => // JOIN
-      buildSources(j.left) ++ buildSources(j.right)
-
-    /* UNARY NODES */
-    case sa: SubqueryAlias => // FROM a AS b ou encore UNION
-      buildSources(sa.child).map { // en cas de UNION, "__auto_generated_subquery_name"
-        case (_, ta: TableIdentifier) => sa.alias -> ta
-      }
-
-    case _: Filter | _: Aggregate | _: Distinct | _: Sort =>
-      buildSources(plan.asInstanceOf[UnaryNode].child)
-
-    case _ => throw new Exception("Unimplemented:\n" + plan)
-  }
 
 }
