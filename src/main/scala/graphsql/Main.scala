@@ -3,18 +3,11 @@ package graphsql
 import graphsql.catalog.CatalogBuilder
 import graphsql.controler.{FileLoader, SQLFileLoader}
 import graphsql.graphx.{GraphBuilder, GraphWriter}
-import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 
+import util._
 
 object Main extends App {
-  def time[R](block: => R): R = {
-    val t0 = System.nanoTime()
-    val result = block // call-by-name
-    val t1 = System.nanoTime()
-    println("Elapsed time: " + (t1 - t0) / 1000000000 + "s")
-    result
-  }
 
   println("GraphSQL")
 
@@ -62,13 +55,14 @@ object Main extends App {
     .appName("GraphSQL")
     .master("local")
     .getOrCreate()
+
   spark.sparkContext.setLogLevel("ERROR")
 
   time {
     val catalog = new NFCatalog()
     val files = FileLoader.load(getClass.getResource("/input.conf"))
     println("Files to process:" + files.size)
-
+/*
     files.foreach { f =>
       time {
         val url = getClass.getResource("/sql/" + f)
@@ -84,12 +78,13 @@ object Main extends App {
         println("End of Processing " + url.getFile)
       }
     }
-
+*/
     println("Building Graph")
     val g = GraphBuilder.buildFromCatalog(catalog)
 
     println("Writing Graph")
     val fileURL = getClass.getResource("/data.js")
+    println(fileURL.getPath)
     GraphWriter.write(fileURL, g)
   }
 

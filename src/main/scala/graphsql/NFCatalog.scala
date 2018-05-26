@@ -19,13 +19,13 @@ class NFCatalog {
   (nameParts: Seq[String], scope: Seq[Vertex]): NFColumn = {
     nameParts.size match {
       case 1 =>
-        val name = nameParts.head
+        val name = nameParts.head.toLowerCase
         if (scope.size > 1) {
           println("No table specification for column " + name)
           getColumn(name)
         } else {
           scope.head match {
-            case c:NFColumn => c
+            case c: NFColumn => c
             case table: NFTable => getColumn(name, table)
             case alias: NFTableAlias =>
               val a = getColumn(name, alias.table)
@@ -36,8 +36,10 @@ class NFCatalog {
 
         }
       case 2 =>
-        scope.filter(p => p.name == nameParts.head).head match {
-          case c:NFColumn => c
+        val tableName = nameParts.head.toLowerCase
+        scope.filter(p => p.name.toLowerCase == tableName)
+           .head match {
+          case c: NFColumn => c
           case table: NFTable => getColumn(nameParts(1), table)
           case alias: NFTableAlias =>
             val a = getColumn(nameParts(1), alias.table)
@@ -124,6 +126,7 @@ object Vertex {
 }
 
 abstract class Vertex(val name: String) extends Serializable {
+  require(name == name.toLowerCase)
 
   val id: VertexId = Vertex.nextId
 
@@ -137,9 +140,9 @@ case class NFTableAlias
   override val name: String,
   table: NFTable
 ) extends Vertex(name) {
-
   val fullName: String = name
 }
+
 /*
 case class NFColumnAlias
 (

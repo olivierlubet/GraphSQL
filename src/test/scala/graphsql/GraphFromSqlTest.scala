@@ -1,8 +1,6 @@
 package graphsql
 
-import graphsql.catalog.CatalogBuilder
 import graphsql.graphx.{GraphBuilder, GraphSQL}
-import org.apache.spark.graphx.{Graph, VertexId}
 import org.scalatest.FunSuite
 
 class GraphFromSqlTest extends FunSuite {
@@ -12,8 +10,8 @@ class GraphFromSqlTest extends FunSuite {
     GraphBuilder.buildFromSql(sql)
   }
 
-  def existOne(g: GraphSQL, columnName: String): Boolean = {
-    1 == g.vertices.filter { case (_, v: Vertex) => v.fullName == columnName }.count
+  def existOne(g: GraphSQL, fullName: String): Boolean = {
+    1 == g.vertices.filter { case (_, v: Vertex) => v.fullName == fullName }.count
   }
 
   def areLinked(g: GraphSQL, fromColumn: String, toColumn: String): Boolean = {
@@ -31,14 +29,52 @@ class GraphFromSqlTest extends FunSuite {
     }
   }
 
-
-  test ("INSERT") {
-
+  /*
+  TODO: insert into ... select -> lier les colonnes nécessite de connaitre la structure cible
+  TODO: développer "*" -> après l'ensemble des traitements,
+   */
+  test("unresolved alias") {
     val g = fromSqlToGraphX(
     """
-      |INSERT
-      |INTO foo.baz
-      |SELECT b.id FROM foo.bar b
+      |SELECT
+      |    CASE
+      |      WHEN id IS NULL
+      |      THEN bar
+      |      ELSE baz
+      |    END
+      |  FROM foo
+      |    """.stripMargin)
+    assert(existOne(g, "foo.id"))
+  }
+
+  test("Create") {
+    val g = fromSqlToGraphX(
+    """
+      |CREATE EXTERNAL TABLE foo (FLUX STRING, FAMILLE STRING) LOCATION 'tmp'
+    """.stripMargin)
+    assert(existOne(g, "foo.flux"))
+  }
+
+  test("Lower upper table name") {
+    val g = fromSqlToGraphX("SELECT U.A, u.b, b.a,B.b FROM foo U, b")
+    assert(existOne(g, "u.a"))
+  }
+
+  test("Runnable command") {
+    val g = fromSqlToGraphX(
+      """
+        |CREATE DATABASE IF NOT EXISTS ${BDD}${BIF_ENV^^} LOCATION '${LOC}/air/AIR_DATA_${BIF_ENV^^}'
+      """.stripMargin)
+    // Nothing to test
+  }
+
+  test("INSERT") {
+
+    val g = fromSqlToGraphX(
+      """
+        |INSERT
+        |INTO foo.baz
+        |SELECT b.id FROM foo.bar b
       """.stripMargin)
     //print(g)
     assert(areLinked(g, "foo.bar.id", "b.id"))
@@ -53,7 +89,7 @@ class GraphFromSqlTest extends FunSuite {
         |SELECT DISTINCT row_number() over() AS id
         |from foo.baz
       """.stripMargin)
-    assert(areLinked(g, "row_number", "id"))
+    assert(areLinked(g, "row_number()", "id"))
     assert(areLinked(g, "id", "foo.bar.id"))
   }
 
@@ -205,8 +241,8 @@ class GraphFromSqlTest extends FunSuite {
         |MAX(m) AS d
         |FROM ${A}.foo
         |GROUP BY a""".stripMargin)
-
-    assert(areLinked(g, "a.foo.m", "d"))
+    assert(areLinked(g, "a.foo.m", "max()"))
+    assert(areLinked(g, "max()", "d"))
     assert(areLinked(g, "d", "b.foo.d"))
   }
 
@@ -218,7 +254,8 @@ class GraphFromSqlTest extends FunSuite {
         |FROM ${A}.foo
         |GROUP BY a
       """.stripMargin)
-    assert(areLinked(g, "a.foo.m", "b"))
+    assert(areLinked(g, "a.foo.m", "max()"))
+    assert(areLinked(g, "max()", "b"))
   }
 
   test("DISTINCT") {

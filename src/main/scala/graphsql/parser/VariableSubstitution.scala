@@ -13,7 +13,10 @@ import scala.util.matching.Regex
 object VariableSubstitution {
 
   // "${prefix:variableName}"
-  private val REF_RE = "\\$\\{(?:(\\w+?):)?(\\S+?)\\}".r
+  //private val REF_RE = "\\$\\{(?:(\\w+?):)?(\\S+?)\\}".r
+  val REF_RE = "\\$\\{(?:(\\w+?):)?(\\S+?)(?:\\^)*\\}".r
+  // ajout du (?:\^)* pour gérer ${BIF_ENV^^}
+  // pour tester : https://regex101.com/
 
   /**
     * Given a query, does variable substitution and return the result.

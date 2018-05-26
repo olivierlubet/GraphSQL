@@ -1,20 +1,18 @@
 package graphsql.catalog
 
 import graphsql._
-import org.apache.spark.sql.catalyst._
 import org.apache.spark.sql.catalyst.analysis._
-import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, _}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.CreateTable
-
-import scala.collection.mutable.ArrayBuffer
+import org.apache.spark.sql.types.StructField
 
 
 case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
 
 
-  // TODO: passer le catalogue en param pour le rendre "fonctionnel"
+  // TODO: passer réécrire le code de façon fonctionnelle (à commencer par le catalogue)
 
   def add(plan: LogicalPlan): NFCatalog = {
     //println(plan)
@@ -22,7 +20,10 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
     catalog
   }
 
+  ////////////////////// LOGICAL PLANS ////////////////////////
+
   private def buildFromPlan(plan: LogicalPlan): Seq[Vertex] = plan match {
+    /* UNARY NODES */
     case p: Project => // SELECT
       val scope = buildFromPlan(p.child)
       buildFromExpressions(scope, p.projectList)
@@ -34,17 +35,10 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
       val scope = buildFromPlan(a.child)
       buildFromExpressions(scope, a.aggregateExpressions)
 
-
-    /* PLAN with subqueries */
-    case u: Union => buildFromPlan(u)
-    case c: CreateTable => buildFromPlan(c)
-    case i: InsertIntoTable => buildFromPlan(i)
-
-    /* UNARY NODES */
     case sa: SubqueryAlias => // FROM a AS b ou encore UNION
       buildFromPlan(sa.child).map {
         case t: NFTable =>
-          NFTableAlias(sa.alias, t)
+          NFTableAlias(sa.alias.toLowerCase, t)
         case c: NFColumn =>
           val ret = sa.alias match {
             // en cas de UNION, sa.alias = "__auto_generated_subquery_name" -> remplacé par c.name
@@ -54,13 +48,16 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
           c.usedFor += ret
           ret
       }
-    /*{
-      case (_, ta: TableIdentifier) => sa.alias -> ta
-    }*/
 
     // Autres Unary Nodes
     case _: Filter | _: Aggregate | _: Distinct | _: Sort =>
       buildFromPlan(plan.asInstanceOf[UnaryNode].child)
+
+    /* PLAN with subqueries */
+    case u: Union => buildFromPlan(u)
+    case c: CreateTable => buildFromPlan(c)
+    case i: InsertIntoTable => buildFromPlan(i)
+
 
     /* BINARY NODES */
     case j: Join => // JOIN
@@ -70,10 +67,12 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
     case r: UnresolvedRelation =>
       Seq(catalog.getTable(r.tableIdentifier))
 
+    /* RUNNABLE COMMAND */
     // Nothing to do
     case _: DropTableCommand |
          _: AlterTableRenameCommand | // TODO : gérer correctement le AlterTable // eg: tiers -> tiers_tmp (note : ne vaut que pour AIR)
-         _: SetCommand => // eg: "hive.exec.parallel=true"
+         _: SetCommand | // eg: "hive.exec.parallel=true"
+         _: CreateDatabaseCommand => // eg: "CREATE DATABASE IF NOT EXISTS"
       Seq.empty
 
     case _ => throw new Exception("Unimplemented:\n" + plan)
@@ -110,22 +109,30 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
 
 
   private def buildFromPlan(c: CreateTable): Seq[Vertex] = {
-    val table = c.tableDesc.identifier
-    val subGraph = c.query match {
-      // Comment traiter en une fois les "Unary Nodes" ???
-      case Some(u: Project) => buildFromPlan(u)
-      case Some(u: Distinct) => buildFromPlan(u)
-      case Some(u: Aggregate) => buildFromPlan(u)
+    val tableIdentifier = c.tableDesc.identifier
+    val table = catalog.getTable(tableIdentifier)
+    c.query match {
+      case Some(u: UnaryNode) =>
+        val subGraph = buildFromPlan(u)
+        subGraph.map {
+          case cc: NFColumn =>
+            val newCol = catalog.getColumn(cc.name, table)
+            cc.usedFor += newCol // Lynk
+            newCol
+        }
+
+      //case Some(u: Project) => buildFromPlan(u)
+      //case Some(u: Distinct) => buildFromPlan(u)
+      //case Some(u: Aggregate) => buildFromPlan(u)
+      case None => {
+        //Quand la création est basée sur une description de champs
+        c.tableDesc.schema.map {
+          f: StructField => catalog.getColumn(f.name, table)
+        }
+      }
       case _ => throw new Exception("Unimplemented:\n" + c.query)
     }
-    val scope = subGraph.map { case cc: NFColumn =>
-      val newCol = catalog.getColumn(
-        cc.name, table.table, table.database
-      )
-      cc.usedFor += newCol // Lynk
-      newCol
-    }
-    scope
+
   }
 
 
@@ -135,80 +142,58 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
   (
     inScope: Seq[Vertex],
     expressions: Seq[Expression]
-  ): Seq[Vertex] = {
-    val graphs = expressions.map(exp => buildFromExpression(inScope, exp))
-    graphs.flatten
-  }
+  ): Seq[Vertex] = expressions.flatMap(exp => buildFromExpression(inScope, exp))
 
   private def buildFromExpression
   (
     inScope: Seq[Vertex],
     exp: Expression
-  ): Seq[Vertex] = {
+  ): Seq[Vertex] = exp match {
 
-    val tables: Map[String, NFTable] = inScope.flatMap {
-      case t: NFTable => Some(t)
-      case _ => None
-    }.map { t => t.name -> t }.toMap
+    /* LEAF Expression */
+    case l: Literal => Seq.empty
 
-    exp match {
+    case f: UnresolvedAttribute => Seq(catalog.getColumn(f.nameParts, inScope))
 
-      /* LEAF Expression */
-      case l: Literal => Seq.empty
+    case s: UnresolvedStar => // TODO : Après constitution du catalogue, gérer les * pour lier l'ensemble des colones source / cible
+      Seq(catalog.getColumn(s.target.getOrElse(Seq.empty) :+ "*", inScope))
 
-      case f: UnresolvedAttribute => Seq(catalog.getColumn(f.nameParts, inScope))
-
-
-      case s: UnresolvedStar => // TODO : Après constitution du catalogue, gérer les * pour lier l'ensemble des colones source / cible
-        Seq(catalog.getColumn(s.target.getOrElse(Seq.empty) :+ "*", inScope))
-
-      /* Expressions */
-      case f: UnresolvedFunction =>
-        val col = catalog.getColumn(f.name.funcName) // TODO: ici distinguer colonne de fonction
+    /* Expressions */
+    case f: UnresolvedFunction => {
+      val col = catalog.getColumn(f.name.funcName+"()") // TODO: ici distinguer colonne de fonction
       val scope: Seq[Vertex] = buildFromExpressions(inScope, f.children)
-        scope.foreach {
-          case c: NFColumn => c.usedFor += col
-          case _ => throw new Exception("Unimplemented:\n" + exp)
-        }
-        Seq(col)
-
-      case c: CaseWhen =>
-        // parcourir l'ensemble des (cases , When) et consolider
-        val branches = c.branches.flatMap {
-          case (cas, whe) => Seq(
-            buildFromExpression(inScope, cas),
-            buildFromExpression(inScope, whe)
-          )
-        }.flatten
-        //val elseBranch = buildFromExpressions(sources, c.elseValue)
-        // TODO: deal with Options(Expression)
-        branches
-
-      /* UnaryExpression */
-      case a: Alias =>
-        val in = buildFromExpression(inScope, a.child)
-        val out = catalog.getColumn(a.name)
-        in.distinct.foreach {
-          case c: NFColumn => c.usedFor += out
-        } // add Links, removing duplicates (local duplicates only)
-        Seq(out)
-
-      case _: IsNull | _: IsNotNull | _: Cast | _: Not =>
-        buildFromUnaryExpression(inScope, exp.asInstanceOf[UnaryExpression])
-
-
-      /* Binary Expression */
-      /* EqualTo  Divide  Multiply  Add  Subtract And GreaterThan GreaterThanOrEqual ...*/
-      case b: BinaryExpression =>
-        buildFromBinaryExpression(inScope, b)
-
-      /* Predicate */
-      case i: In => buildFromExpression(inScope, i.value)
-
-      case w: WindowExpression => buildFromExpression(inScope, w.windowFunction)
-
-      case _ => throw new Exception("Unimplemented:\n" + exp)
+      scope.foreach {
+        case c: NFColumn => c.usedFor += col
+        case _ => throw new Exception("Unimplemented:\n" + exp)
+      }
+      Seq(col)
     }
+
+    case c: CaseWhen =>
+      // parcourir l'ensemble des (cases , When) et consolider
+      val branches = c.branches.flatMap {
+        case (cas, whe) => Seq(
+          buildFromExpression(inScope, cas),
+          buildFromExpression(inScope, whe)
+        )
+      }.flatten
+      //val elseBranch = buildFromExpressions(sources, c.elseValue)
+      // TODO: deal with Options(Expression)
+      branches
+
+    /* UnaryExpression */
+    case u: UnaryExpression => buildFromUnaryExpression(inScope, u)
+
+    /* Binary Expression */
+    /* EqualTo  Divide  Multiply  Add  Subtract And GreaterThan GreaterThanOrEqual ...*/
+    case b: BinaryExpression => buildFromBinaryExpression(inScope, b)
+
+    /* Predicate */
+    case i: In => buildFromExpression(inScope, i.value)
+
+    case w: WindowExpression => buildFromExpression(inScope, w.windowFunction)
+
+    case _ => throw new Exception("Unimplemented:\n" + exp)
   }
 
   def buildFromBinaryExpression[T <: BinaryExpression]
@@ -222,7 +207,37 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
   (
     inScope: Seq[Vertex],
     u: UnaryExpression
-  ): Seq[Vertex] =
-    buildFromExpression(inScope, u.child)
+  ): Seq[Vertex] = u match {
+    case n: NamedExpression =>
+      val in = buildFromExpression(inScope, n.child)
+      val out = catalog.getColumn(n match {
+        case a: Alias => a.name
+        case _: UnresolvedAlias => "UnresolvedAlias"
+      })
+      in.distinct.foreach {
+        case c: NFColumn => c.usedFor += out
+      } // add Links, removing duplicates (local duplicates only)
+      Seq(out)
+    /*
+  case a: Alias =>
+    val in = buildFromExpression(inScope, a.child)
+    val out = catalog.getColumn(a.name)
+    in.distinct.foreach {
+      case c: NFColumn => c.usedFor += out
+    } // add Links, removing duplicates (local duplicates only)
+    Seq(out)
+  case u: UnresolvedAlias =>
+    val in = buildFromExpression(inScope, u.child)
+    val out = catalog.getColumn("anonymous")
+    in.distinct.foreach {
+      case c: NFColumn => c.usedFor += out
+    } // add Links, removing duplicates (local duplicates only)
+    Seq(out)*/
+
+    //_: IsNull | _: IsNotNull | _: Cast | _: Not
+    case _ =>
+      buildFromExpression(inScope, u.child)
+  }
+
 
 }
