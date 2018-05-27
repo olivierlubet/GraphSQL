@@ -1,9 +1,14 @@
-import graphsql.parser.VariableSubstitution.REF_RE
+import java.io.File
+
+
 
 import scala.util.matching.Regex
 
 
-//val REF_RE = "\\$\\{(?:(\\w+?):)?(\\S+?)\\}".r
+new File(".").getAbsolutePath
+System.getProperty("user.dir")
+
+
 val REF_RE = "\\$\\{(?:(\\w+?):)?(\\S+?)(?:\\^)*\\}".r
 // ajout du (?:\^)* pour gérer ${BIF_ENV^^}
 

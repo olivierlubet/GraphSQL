@@ -1,5 +1,7 @@
 name := "GraphSQL"
 
+javaOptions ++= Seq("-Xmx8G")
+
 version := "0.1"
 
 //scalaVersion := "2.11"
@@ -30,4 +32,6 @@ libraryDependencies ++= Seq(
 // https://mvnrepository.com/artifact/org.json4s/json4s-native
 libraryDependencies += "org.json4s" %% "json4s-native" % "3.6.0-M3"
 
-javaOptions ++= Seq("-Xmx8G")
+
+
+libraryDependencies += "com.github.scopt" % "scopt_2.11" % "3.7.0"

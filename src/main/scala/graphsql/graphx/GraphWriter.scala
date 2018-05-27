@@ -9,6 +9,8 @@ import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
 
 object GraphWriter {
+
+  def write(file: File, graph: GraphSQL): Unit = write(file.toURI.toURL,graph)
   def write(out: URL, graph: GraphSQL): Unit = {
     val file = new File(out.getPath)
     if (file.exists()) file.delete()

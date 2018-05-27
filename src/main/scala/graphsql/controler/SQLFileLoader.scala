@@ -1,5 +1,6 @@
 package graphsql.controler
 
+import java.io.File
 import java.net.URL
 
 import graphsql.util.Control
@@ -8,24 +9,26 @@ import scala.util.{Failure, Success}
 
 object SQLFileLoader {
 
+  def load(file:File):List[String] = load(file.toURI.toURL)
   def load(url: URL): List[String] = {
-
-    Control.readURL(url) match {
+    Control.read(url) match {
       case Failure(s) =>
         println(s"Failed reading $url : $s")
         List()
-      case Success(lines) => lines
-        .map(s =>
-          if (s.length > 0 && s.charAt(0) == '#') ""
-          else eraseComment(s)
-        ) // Supprimer les commentaires
-        .mkString(" ") // Rassembler toutes les lignes en une seule
-        .split(";") // Séparer les requêtes une à une // Bug potentiel : des ';' en chaine de caractère
-        .map(_.trim) // Supprimer les espaces avant / après
-        .filter(_.length > 0) // Supprimer les lignes vides
-        .toList
+      case Success(lines) => process(lines)
     }
   }
+
+  def process (lines:List[String]):List[String] = lines
+    .map(s =>
+      if (s.length > 0 && s.charAt(0) == '#') ""
+      else eraseComment(s)
+    ) // Supprimer les commentaires
+    .mkString(" ") // Rassembler toutes les lignes en une seule
+    .split(";") // Séparer les requêtes une à une // Bug potentiel : des ';' en chaine de caractère
+    .map(_.trim) // Supprimer les espaces avant / après
+    .filter(_.length > 0) // Supprimer les lignes vides
+    .toList
 
   def eraseComment(str: String): String = {
     object MyState extends Enumeration {

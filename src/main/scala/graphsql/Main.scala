@@ -1,15 +1,40 @@
 package graphsql
 
+import java.io.File
+
 import graphsql.catalog.CatalogBuilder
-import graphsql.controler.{FileLoader, SQLFileLoader}
+import graphsql.controler._
 import graphsql.graphx.{GraphBuilder, GraphWriter}
 import org.apache.spark.sql.SparkSession
-
 import util._
 
 object Main extends App {
 
-  println("GraphSQL")
+  case class Config
+  (
+    out: File = new File("C:\\Users\\hyma\\Documents\\GraphSQL\\data.js"),
+    in: File = new File("C:\\Users\\hyma\\Documents\\GraphSQL\\")
+  )
+
+  val parser = new scopt.OptionParser[Config]("scopt") {
+    head("GraphSQL", "0.1")
+
+    opt[File]('i', "in").optional().valueName("<file>").
+      text("Folder to scan for '.sql' files")
+    opt[File]('o', "out").optional().valueName("<file>").
+      text("Folder where GraphSQL will output its files")
+
+    help("help").text("prints this usage text")
+  }
+
+  // parser.parse returns Option[C]
+  parser.parse(args, Config()) match {
+    case Some(config) => run(config)
+    // do stuff
+
+    case None =>
+    // arguments are bad, error message will have been displayed
+  }
 
 
   /**
@@ -49,45 +74,50 @@ object Main extends App {
   getListOfFiles(folder).foreach(f => println(f.getName))
   */
 
+  def run(config: Config): Unit = {
+    lazy val spark: SparkSession = SparkSession
+      .builder
+      .appName("GraphSQL")
+      .master("local")
+      .getOrCreate()
 
-  lazy val spark: SparkSession = SparkSession
-    .builder
-    .appName("GraphSQL")
-    .master("local")
-    .getOrCreate()
+    spark.sparkContext.setLogLevel("ERROR")
 
-  spark.sparkContext.setLogLevel("ERROR")
+    println(config)
 
-  time {
-    val catalog = new NFCatalog()
-    val files = FileLoader.load(getClass.getResource("/input.conf"))
-    println("Files to process:" + files.size)
-/*
-    files.foreach { f =>
-      time {
-        val url = getClass.getResource("/sql/" + f)
-        println("Processing " + url.getFile)
+    time {
+      val catalog = new NFCatalog()
 
-        val sqls = SQLFileLoader.load(url)
-        println(sqls.size + " more sql requests to process")
+      val files = FileLoader.load(new File(config.in.getAbsolutePath+"/input.conf"))
+      println("Files to process:" + files.size)
 
-        sqls.foreach { sql =>
-          val plan = Parser.parse(sql)
-          CatalogBuilder(catalog).add(plan)
+        files.foreach { f =>
+          time {
+            val file = new File(config.in.getAbsolutePath+"/sql/"+f)
+
+            println("Processing " + file)
+
+            val sqls = SQLFileLoader.load(file)
+            println(sqls.size + " more sql requests to process")
+
+            sqls.foreach { sql =>
+              val plan = Parser.parse(sql)
+              CatalogBuilder(catalog).add(plan)
+            }
+            println("End of Processing " + file)
+          }
         }
-        println("End of Processing " + url.getFile)
-      }
+
+      println("Building Graph")
+      val g = GraphBuilder.buildFromCatalog(catalog)
+
+      println("Writing Graph")
+
+      println(config.out)
+      GraphWriter.write(config.out, g)
     }
-*/
-    println("Building Graph")
-    val g = GraphBuilder.buildFromCatalog(catalog)
 
-    println("Writing Graph")
-    val fileURL = getClass.getResource("/data.js")
-    println(fileURL.getPath)
-    GraphWriter.write(fileURL, g)
+    spark.close()
   }
-
-  spark.close()
 }
 

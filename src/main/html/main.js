@@ -9,7 +9,7 @@ var initialized = false;
 var nodes = new vis.DataSet();
 var edges = new vis.DataSet();
 
-
+document.getElementById('body').onkeypress = keypressEvent
 
 //Make the network
 function makeNetwork() {
@@ -21,11 +21,10 @@ function makeNetwork() {
 
 // Bind the network events
 function bindNetwork(){
-    network.on("click",clickEvent);
-
-    network.on("doubleClick", doubleClickEvent);
+    //network.on("click",clickEvent);
+    //network.on("doubleClick", doubleClickEvent);
 }
-
+/*
 function clickEvent (params) {
   if (params.nodes.length) { //Did the click occur on a node?
     var nodeId = params.nodes[0]; //The id of the node clicked
@@ -36,11 +35,34 @@ function clickEvent (params) {
 function doubleClickEvent (params) {
   if (params.nodes.length) { //Did the click occur on a node?
     var nodeId = params.nodes[0]; //The id of the node clicked
-    expandNodeToR(nodeId);
+    expandNodeTo(nodeId,true);
   }
 }
+*/
 
-function expandNodeFrom (nodeId) { // Expand all nodes from this one
+//https://www.w3schools.com/jsref/obj_keyboardevent.asp
+function keypressEvent (ke) {
+    //debugger
+    switch (ke.key) {
+        case "/" : lookForNode(); break;
+        case "*" : getSelectedNode(expandSelection); break;
+        case "+" : getSelectedNode(function (nodeId) {expandNodeTo(nodeId);expandNodeFrom(nodeId);}); break;
+        case "<" : getSelectedNode(function (nodeId) {expandNodeTo(nodeId,true)}); break;
+        case ">" : getSelectedNode(function (nodeId) {expandNodeFrom(nodeId,true)}); break;
+    }
+}
+
+function getSelectedNode(callback) {
+    if (network.getSelection().nodes.length != 1) {
+        alert("Vous devez sélectionner un élément");
+    } else {
+        var nodeId = network.getSelection().nodes[0];
+        callback(nodeId)
+    }
+}
+
+
+function expandNodeFrom (nodeId, rcur=false) { // Expand all nodes from this one
     data.edges.
     filter(edge => edge.from == nodeId).
     forEach (edge => {
@@ -50,10 +72,12 @@ function expandNodeFrom (nodeId) { // Expand all nodes from this one
         if (!getEdgeConnecting (edge.from,edge.to)) {
             edges.add(edge);
         }
+        if (rcur) expandNodeFrom(edge.to,rcur);
     })
 }
 
-function expandNodeToR (nodeId) { // Expand all nodes pointing TO this one RECURSIVELY
+
+function expandNodeTo (nodeId, rcur=false) { // Expand all nodes pointing TO this one
     data.edges.
     filter(edge => edge.to == nodeId).
     forEach (edge => {
@@ -63,7 +87,7 @@ function expandNodeToR (nodeId) { // Expand all nodes pointing TO this one RECUR
         if (!getEdgeConnecting (edge.from,edge.to)) {
             edges.add(edge);
         }
-        expandNodeToR(edge.from);
+        if (rcur) expandNodeTo(edge.from,rcur);
     })
 }
 
@@ -78,8 +102,33 @@ function getEdgeConnecting(a, b) {
 }
 
 function initData() {
-    data.nodes.filter(node => node.group=="NFDatabase").forEach(node => nodes.add(node))
+    data.nodes.filter(node => node.group=="NFDatabase").forEach(node =>nodes.add(node))
 }
+
+
+function lookForNode () {
+    var name = prompt("base.table.champ","tiers_siren")
+
+// TODO: remplacer par node.fullname
+    if (name)
+    data.nodes.filter(node => node.label.includes(name)).forEach(node => {
+        if (nodes.getIds().indexOf(node.id) == -1) {
+            nodes.add(node)
+            expandNodeTo(node.id,true);
+
+        }
+    });
+}
+
+function expandSelection(nodeId) {
+    edges.clear();
+    nodes.clear();
+    initData();
+    data.nodes.filter(node => node.id==nodeId).forEach(node => nodes.add(node));
+    expandNodeTo(nodeId,true);
+    expandNodeFrom(nodeId,true);
+}
+
 
 
 makeNetwork()
