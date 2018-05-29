@@ -1,31 +1,12 @@
 import java.io.File
 
+import graphsql.controler.SQLFileLoader
 
 
-import scala.util.matching.Regex
+val q = "CREATE TABLE BDD_LEASING_DATA.projet_conquete  LIKE BDD_LEASING_DATA_TMP.projet_conquete_tmp STORED AS PARQUET blabla"
+q.replaceAll("STORED AS PARQUET","")
 
+SQLFileLoader.eraseSomeKeywords(q)
 
-new File(".").getAbsolutePath
-System.getProperty("user.dir")
-
-
-val REF_RE = "\\$\\{(?:(\\w+?):)?(\\S+?)(?:\\^)*\\}".r
-// ajout du (?:\^)* pour gérer ${BIF_ENV^^}
-
-def substitute(input: String): String = {
-  if (input != null) {
-    REF_RE.replaceAllIn(input, { m =>
-      val prefix = m.group(1)
-      val name = m.group(2)
-      val ref = if (prefix == null) name else s"$prefix-$name"
-      Regex.quoteReplacement(ref)
-    })
-  } else {
-    input
-  }
-}
-
-substitute("abc${bb}ddd")
-
-
-substitute("abc${bb^^}ddd")
+List("STORED AS PARQUET")
+  .foldLeft(q)((str,kw) => str.replaceAll(kw,""))

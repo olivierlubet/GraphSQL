@@ -26,7 +26,7 @@ object GraphWriter {
   }
 
   def json(graph: GraphSQL): JValue = {
-println(graph.vertices.collect().size)// ici ano
+
     val nodes = graph.vertices.map { case (id, v)  => // name) =>
       ("id" -> id) ~ ("label" -> v.name) ~ ("group" -> v.group)
     }.collect.toList

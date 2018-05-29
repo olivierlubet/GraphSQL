@@ -20,10 +20,20 @@ class NFCatalog {
     nameParts.size match {
       case 1 =>
         val name = nameParts.head.toLowerCase
-        if (scope.size > 1) {
-          println("No table specification for column " + name)
-          getColumn(name)
-        } else {
+        if (scope.size > 1) { // La colonne n'est spécifiée que par son nom et il y a indécision sur la table => nécessité de creuser le scope
+          val potential = scope.flatMap {
+            case c: NFColumn => if (c.name == name) Option(c) else None
+            case t: NFTable => t.columns.get(name)
+            case NFTableAlias(_, t) => t.columns.get(name)
+          }
+          if (potential.size == 1) {
+            potential.head
+          } else { // cas >0 normalement improbable, cas =0 compréhensible si on ne connait pas la structure des tables du scope
+            println("No table specification for column [reason:"+potential.size+"] " + name)
+            getColumn(name)
+          }
+        }
+        else {
           scope.head match {
             case c: NFColumn => c
             case table: NFTable => getColumn(name, table)
@@ -37,8 +47,11 @@ class NFCatalog {
         }
       case 2 =>
         val tableName = nameParts.head.toLowerCase
-        scope.filter(p => p.name.toLowerCase == tableName)
-           .head match {
+        //println(nameParts)
+        //println(scope)
+        scope.filter {
+          p: Vertex => p.name.toLowerCase == tableName
+        }.head match {
           case c: NFColumn => c
           case table: NFTable => getColumn(nameParts(1), table)
           case alias: NFTableAlias =>

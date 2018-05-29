@@ -59,8 +59,8 @@ object Main extends App {
   //val fileURL = getClass.getResource("/data.js")
 
 
-  /*
-  val folder = "C:\\Users\\hyma\\IdeaProjects\\GraphSQL\\src\\main\\resources\\sql"
+/*
+  val folder = "C:\\Users\\hyma\\Documents\\GraphSQL\\sql"
 
   def getListOfFiles(dir: String):List[File] = {
     val d = new File(dir)
@@ -72,7 +72,7 @@ object Main extends App {
   }
 
   getListOfFiles(folder).foreach(f => println(f.getName))
-  */
+*/
 
   def run(config: Config): Unit = {
     lazy val spark: SparkSession = SparkSession

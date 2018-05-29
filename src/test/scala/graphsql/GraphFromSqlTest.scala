@@ -33,6 +33,27 @@ class GraphFromSqlTest extends FunSuite {
   TODO: insert into ... select -> lier les colonnes nécessite de connaitre la structure cible
   TODO: développer "*" -> après l'ensemble des traitements,
    */
+
+  test("Dig deeper for resolving column's table") {
+    val g = fromSqlToGraphX(
+    """
+      |SELECT concat('004_',id) AS id,b
+      |FROM ( SELECT DISTINCT row_number() over() AS id, n.b FROM ${a}.foo n ) bar
+    """.stripMargin)
+    print(g)
+    assert(existOne(g, "bar.id"))
+    assert(areLinked(g, "id", "bar.id"))
+    assert(areLinked(g, "bar.id", "concat()"))
+  }
+  /*
+  test ("Create like") {
+    val catalog = new NFCatalog()
+    List("Select a,b from db.foo", "create table db.bar like db.foo" )
+      .foreach(GraphBuilder.buildFromSql(_,catalog))
+    val g = GraphBuilder.buildFromCatalog(catalog)
+    assert(existOne(g, "db.foo.a"))
+    assert(existOne(g, "db.foo.b"))
+  }
   test("unresolved alias") {
     val g = fromSqlToGraphX(
     """
@@ -349,5 +370,5 @@ class GraphFromSqlTest extends FunSuite {
     val g = fromSqlToGraphX(sql)
     //print(g)
     assert(existOne(g, "baz.foo"))
-  }
+  }*/
 }
