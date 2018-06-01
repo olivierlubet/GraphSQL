@@ -1,12 +1,5 @@
-import java.io.File
-
-import graphsql.controler.SQLFileLoader
 
 
-val q = "CREATE TABLE BDD_LEASING_DATA.projet_conquete  LIKE BDD_LEASING_DATA_TMP.projet_conquete_tmp STORED AS PARQUET blabla"
-q.replaceAll("STORED AS PARQUET","")
+val l = List (1,2,3,4,5,6,7,8,9)
 
-SQLFileLoader.eraseSomeKeywords(q)
-
-List("STORED AS PARQUET")
-  .foldLeft(q)((str,kw) => str.replaceAll(kw,""))
+l.partition(e=>e%2==0)

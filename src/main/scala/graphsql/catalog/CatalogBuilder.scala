@@ -40,12 +40,12 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
 
       val table = catalog.getTable(sa.alias)
 
-      val ret = childs.flatMap{
+      val ret = childs.flatMap {
         case t: NFTable => // FROM a AS b
           Option(NFTableAlias(sa.alias.toLowerCase, t))
         case c: NFColumn => // (SELECT a,z FROM b) AS c || SELECT a,z FROM b UNION SELECT x,y FROM d
           val ret = catalog.getColumn(c.name, table)
-          c.usedFor += ret
+          c.linkTo(ret)
           None // Les colonnes sont empaquetées dans la table
       }
 
@@ -101,7 +101,7 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
     buildFromPlan(i.query).map {
       case c: NFColumn =>
         val newCol = catalog.getColumn(c.name, table)
-        c.usedFor += newCol
+        c.linkTo(newCol)
         newCol
     }
   }
@@ -129,18 +129,16 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
     val tableIdentifier = c.tableDesc.identifier
     val table = catalog.getTable(tableIdentifier)
     c.query match {
+      // Project, Distinct, Aggregate
       case Some(u: UnaryNode) =>
         val subGraph = buildFromPlan(u)
         subGraph.map {
           case cc: NFColumn =>
             val newCol = catalog.getColumn(cc.name, table)
-            cc.usedFor += newCol // Lynk
+            cc.linkTo(newCol)
             newCol
         }
 
-      //case Some(u: Project) => buildFromPlan(u)
-      //case Some(u: Distinct) => buildFromPlan(u)
-      //case Some(u: Aggregate) => buildFromPlan(u)
       case None => {
         //Quand la création est basée sur une description de champs
         c.tableDesc.schema.map {
@@ -168,19 +166,21 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
   ): Seq[Vertex] = exp match {
 
     /* LEAF Expression */
-    case l: Literal => Seq.empty
+    case l: Literal => Seq(catalog.getColumn(l.toString()))
 
     case f: UnresolvedAttribute => Seq(catalog.getColumn(f.nameParts, inScope))
 
-    case s: UnresolvedStar => // TODO : Après constitution du catalogue, gérer les * pour lier l'ensemble des colones source / cible
-      Seq(catalog.getColumn(s.target.getOrElse(Seq.empty) :+ "*", inScope))
+    case s: UnresolvedStar => // Note : cela ne sert à rien de faire des liaisons ici, la structure n'est pas encore connue
+      val col = catalog.getColumn(s.target.getOrElse(Seq.empty) :+ "*", inScope)
+      Seq(col)
 
     /* Expressions */
     case f: UnresolvedFunction => {
-      val col = catalog.getColumn(f.name.funcName + "()") // TODO: ici distinguer colonne de fonction
+      //println(f.toString())
+      val col = catalog.getColumn(f.name.funcName + "()")
       val scope: Seq[Vertex] = buildFromExpressions(inScope, f.children)
       scope.foreach {
-        case c: NFColumn => c.usedFor += col
+        case c: NFColumn => c.linkTo(col)
         case _ => throw new Exception("Unimplemented:\n" + exp)
       }
       Seq(col)
@@ -232,7 +232,7 @@ case class CatalogBuilder(catalog: NFCatalog = new NFCatalog) {
         case _: UnresolvedAlias => "UnresolvedAlias"
       })
       in.distinct.foreach {
-        case c: NFColumn => c.usedFor += out
+        case c: NFColumn => c.linkTo(out)
       } // add Links, removing duplicates (local duplicates only)
       Seq(out)
 

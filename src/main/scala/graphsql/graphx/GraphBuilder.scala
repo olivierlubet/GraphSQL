@@ -38,7 +38,8 @@ object GraphBuilder {
   }
 
   def buildFromCatalog(catalog: NFCatalog): GraphSQL = {
-    val browser = new CatalogBrowser(catalog)
+    val catalogExt = CatalogStarExtender.extend(catalog)
+    val browser = new CatalogBrowser(catalogExt)
     val vertex = browser.vertices.map(v => (v.id, v))
     val edges: Seq[Edge[String]] = browser.edges
     Graph(sc.parallelize(vertex), sc.parallelize(edges))

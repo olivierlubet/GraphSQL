@@ -2,7 +2,6 @@ package graphsql
 
 import org.apache.spark.graphx.VertexId
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -29,7 +28,7 @@ class NFCatalog {
           if (potential.size == 1) {
             potential.head
           } else { // cas >0 normalement improbable, cas =0 compréhensible si on ne connait pas la structure des tables du scope
-            println("No table specification for column [reason:"+potential.size+"] " + name)
+            println("No table specification for column [reason:" + potential.size + "] " + name)
             getColumn(name)
           }
         }
@@ -40,7 +39,7 @@ class NFCatalog {
             case alias: NFTableAlias =>
               val a = getColumn(name, alias.table)
               val b = getColumn(name, alias.name, None)
-              a.usedFor += b
+              a.linkTo(b)
               b
           }
 
@@ -57,7 +56,7 @@ class NFCatalog {
           case alias: NFTableAlias =>
             val a = getColumn(nameParts(1), alias.table)
             val b = getColumn(nameParts(1), alias.name, None)
-            a.usedFor += b
+            a.linkTo(b)
             b
         }
     }
@@ -78,6 +77,12 @@ class NFCatalog {
   def getColumn
   (columnName: String, tableName: String, dbName: Option[String]): NFColumn =
     getColumn(columnName, getTable(tableName, dbName))
+
+  def getColumn
+  (columnName: String, table: Option[NFTable]): NFColumn = table match {
+    case None => getColumn(columnName)
+    case Some(t: NFTable) => getColumn(columnName, t)
+  }
 
   def getColumn
   (columnName: String, table: NFTable): NFColumn = {
@@ -156,16 +161,6 @@ case class NFTableAlias
   val fullName: String = name
 }
 
-/*
-case class NFColumnAlias
-(
-  override val name: String,
-  column: NFColumn
-) extends Vertex(name) {
-
-  val fullName: String = name
-}
-*/
 case class NFColumn
 (
   override val name: String,
@@ -182,8 +177,21 @@ case class NFColumn
   } + name
 
   val usedFor: ListBuffer[NFColumn] = ListBuffer.empty
+  val comesFrom: ListBuffer[NFColumn] = ListBuffer.empty
 
+  def linkTo(to: NFColumn): NFColumn = {
+    usedFor += to
+    to.comesFrom += this
+    this
+  }
 
+  def unlinkFrom(from: NFColumn): NFColumn = {
+    if (comesFrom.indexOf(from) >= 0) comesFrom.remove(comesFrom.indexOf(from))
+    if (from.usedFor.indexOf(this) >= 0) from.usedFor.remove(from.usedFor.indexOf(this))
+    this
+  }
+
+  lazy val isStar: Boolean = name == "*"
 }
 
 
@@ -204,7 +212,7 @@ case class NFTable
     }
   } + name
 
-  var columns: mutable.HashMap[String, NFColumn] = mutable.HashMap[String, NFColumn]()
+  val columns: mutable.HashMap[String, NFColumn] = mutable.HashMap[String, NFColumn]()
 
 }
 

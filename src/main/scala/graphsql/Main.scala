@@ -72,8 +72,8 @@ object Main extends App {
   }
 
   getListOfFiles(folder).foreach(f => println(f.getName))
-*/
 
+*/
   def run(config: Config): Unit = {
     lazy val spark: SparkSession = SparkSession
       .builder
